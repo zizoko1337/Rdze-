@@ -1,0 +1,20 @@
+RDZEN - prototyp na Windows x64
+
+Uruchom Rdzen.exe dwuklikiem. Mozesz przenosic sam plik EXE.
+Gra zawiera grafiki i biblioteke SDL. Nie wymaga instalowania silnika,
+Node.js ani przegladarki. Wymagany Windows 10/11 i Direct3D 11.
+
+Pierwszy start zapisuje dane w %LOCALAPPDATA%\Rdzen\Prototyp.
+Kolejne uruchomienia korzystaja z zapisanych plikow.
+
+Sterowanie:
+Po wejsciu na platforme uruchom wydobycie czerwonym przyciskiem za dzialem [E].
+Lewy komputer: ulepszenia. Prawy: jednorazowe uslugi za punkty z niebieskich kart.
+1-9 wybor jednego z 9 dzial manualnych, Enter start; WASD chodzenie; mysz rozgladanie.
+E fotel / komputer / wyjscie z dziala. LPM strzelanie.
+Tab widok z gory. LPM heks: dostawa dziala; LPM krysztal: wyslij drona.
+C dron po najblizszy krysztal. P pauza. F1 pomoc. F11 pelny ekran.
+R nowa ekspedycja. Alt+F4 wyjscie.
+
+Uran daje wybor ulepszenia przy bocznym komputerze. Boss co 3 minuty.
+Fabryka jezdzikow odblokowywana jest karta ulepszenia.

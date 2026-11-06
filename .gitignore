@@ -1,0 +1,16 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+*.log
+.toolchain/
+native/build/
+artifacts/
+/Rdzen.exe
+/Rdzen-prototyp.zip
+.env
+.env.*
+!.env.example
+.agents/
+.codex/
+.aws/
