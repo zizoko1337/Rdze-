@@ -180,3 +180,5 @@ Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry 
 Wszystkie dziewięć dział ma teraz własny legendarny moduł. Tesla odblokowuje PPM ze wzmacnianiem wieżyczek, katapulta klej unieruchamiający, moździerz dwa odbicia, Smart Instant namierzanie, snajper +2% obrażeń za metr i drugi ekran CRT, miotacz dwa jednoczesne strumienie. [Pełne zasady i nazwy kart](LEGENDY_MANUALNE.md).
 
 Paczka ZIP zawiera również Uruchom-Linux.sh i LINUX.txt: uruchamianie buildu Windows przez Wine albo Steam Proton. To nie jest natywny port Linux; działanie na Linux nie zostało tutaj zweryfikowane.
+
+Czterech nowych bossów: Żmij segmentowy, Śluzowiec (łącznie 24000 HP), Pożeracz oraz Plujec alfa. Wszystkich przywołasz z bestiariusza pod apostrofem. Mechaniki i statystyki: [BOSSY.md](BOSSY.md).

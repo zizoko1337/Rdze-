@@ -28,6 +28,7 @@ inline int run(int argc, char** argv) {
   bool coreTest = false;
   bool revisionTest = false;
   bool legendsTest = false;
+  bool bossTest = false;
   for (int i = 1; i < argc; ++i) {
     test |= std::string(argv[i]) == "--command-test";
     testMini |= std::string(argv[i]) == "--minigun";
@@ -48,6 +49,7 @@ inline int run(int argc, char** argv) {
     coreTest |= std::string(argv[i]) == "--core-test";
     revisionTest |= std::string(argv[i]) == "--revision-test";
     legendsTest |= std::string(argv[i]) == "--legends-test";
+    bossTest |= std::string(argv[i]) == "--boss-test";
   }
   plasmaTest |= coolingTest;
   revisionTest |= legendsTest;
@@ -56,7 +58,7 @@ inline int run(int argc, char** argv) {
   deliveryTest |= upgradeTest;
   progressionTest |= deliveryTest;
   test |= progressionTest || frontierTest || servicesTest || manualTest || radioTest ||
-          plasmaTest || enemyTest || coreTest;
+          plasmaTest || enemyTest || coreTest || bossTest;
   progressionLab |= frontierLab;
   const bool liveExpedition = !test || progressionTest || frontierTest || servicesTest ||
                               radioTest || plasmaTest || enemyTest || coreTest;
@@ -72,7 +74,8 @@ inline int run(int argc, char** argv) {
     } runtime;
     auto root = std::filesystem::current_path(), assets = root / "public" / "assets";
     auto artifacts = root / "artifacts" / "command" /
-                     (legendsTest    ? "manual-legends"
+                     (bossTest       ? "bosses"
+                      : legendsTest ? "manual-legends"
                       : revisionTest ? "manual-revision"
                       : coreTest     ? "core"
                       : enemyTest    ? "enemies"
@@ -142,6 +145,8 @@ inline int run(int argc, char** argv) {
     bool revisionPourSeen = false, revisionNozzleUp = false;
     std::array<bool, 6> legendsInstalled{};
     bool legendsTeslaSent = false, legendsTeslaPass = false;
+    int bossIndex = 0, bossVisualFrame = 0;
+    std::array<bool, 4> bossSpawnChecks{}, bossActionChecks{};
     std::array<bool, GUN_COUNT> manualChecks{};
     bool manualSightShot = false, manualModelShot = false;
     bool radioDeployed = false, radioControls = false;
@@ -349,6 +354,98 @@ inline int run(int argc, char** argv) {
       double dt = std::min(.1, std::chrono::duration<double>(now - last).count());
       last = now;
       double wall = std::chrono::duration<double>(now - begin).count();
+      if (bossTest) {
+        constexpr Species kinds[] = {Wyrm, Slime, Devourer, SiegeBoss};
+        if (stage == 0 && wall > .3) {
+          click(ui.launch());
+          stage = 1;
+        } else if (stage == 1 && session->mode == Mode::Walking) {
+          session->world = Game(false);
+          session->world.autoWaves = false;
+          session->spawnTimer = 100000;
+          key(SDL_SCANCODE_APOSTROPHE);
+          stage = 2;
+        } else if (stage == 2 && session->bestiaryOpen) {
+          if (bossIndex == 0)
+            capture = "bosses-01-bestiary.png";
+          click(Bestiary::card(ui, kinds[bossIndex]));
+          stageAt = wall;
+          stage = 3;
+        } else if (stage == 3 && wall - stageAt > .2) {
+          bossSpawnChecks[bossIndex] = session->frontier.spawned[kinds[bossIndex]] == 1;
+          fixture = session->world.active.empty() ? -1 : session->world.active.back();
+          if (fixture >= 0 && kinds[bossIndex] == SiegeBoss) {
+            session->world.foes[fixture].x = 0;
+            session->world.foes[fixture].z = SIEGE_RANGE;
+            session->world.foes[fixture].speed = 0;
+          }
+          if (fixture >= 0 && kinds[bossIndex] == Devourer) {
+            // Seed ordinary nearby foes before the ability; the boss creates none.
+            const auto boss = session->world.foes[fixture];
+            for (int n = 0; n < 8; ++n) {
+              float angle = n * PI / 4, radius = 24 + n * 3.f;
+              int id = session->world.spawn(Species(n % 3), boss.x + std::sin(angle) * radius,
+                                             boss.z + std::cos(angle) * radius);
+              if (id >= 0)
+                session->world.foes[id].speed = 0;
+            }
+          }
+          key(SDL_SCANCODE_APOSTROPHE);
+          stage = 4;
+        } else if (stage == 4 && !session->bestiaryOpen) {
+          stageAt = wall;
+          bossVisualFrame = 0;
+          stage = 5;
+        } else if (stage == 5 && fixture >= 0) {
+          float elapsed = float(wall - stageAt);
+          auto& g = session->world;
+          if (bossVisualFrame == 0 && elapsed > .5f) {
+            capture = "bosses-" + std::to_string(bossIndex + 2) + "-whole.png";
+            bossVisualFrame = 1;
+            if (kinds[bossIndex] == Devourer)
+              g.hurt(fixture, g.foes[fixture].maxHp * .25f, Laser);
+          } else if (bossVisualFrame == 1 && elapsed > 1.1f) {
+            if (kinds[bossIndex] == Slime)
+              g.hurt(fixture, g.foes[fixture].hp, Laser);
+            bossVisualFrame = 2;
+          } else if (bossVisualFrame == 2 && elapsed > 1.5f) {
+            capture = "bosses-" + std::to_string(bossIndex + 2) + "-ability.png";
+            bossVisualFrame = 3;
+          } else if (bossVisualFrame == 3 && elapsed > 2) {
+            if (kinds[bossIndex] == Slime) {
+              auto targets = g.active;
+              for (int id : targets)
+                if (g.foes[id].type == Slime && g.foes[id].hp > 0)
+                  g.hurt(id, g.foes[id].hp, Laser);
+            }
+            bossVisualFrame = 4;
+          } else if (bossVisualFrame == 4 && elapsed > 3.5f) {
+            capture = "bosses-" + std::to_string(bossIndex + 2) + "-late.png";
+            bossVisualFrame = 5;
+          }
+          if (elapsed > 7.2f) {
+            int alive = 0;
+            for (int id : g.active)
+              alive += g.foes[id].type == Slime && g.foes[id].hp > 0;
+            bossActionChecks[bossIndex] = kinds[bossIndex] == Wyrm ? !g.worms.empty()
+                : kinds[bossIndex] == Slime ? alive == 4
+                : kinds[bossIndex] == Devourer ? g.foes[fixture].feedUsed == 1 &&
+                                                   g.foes[fixture].hp > g.foes[fixture].maxHp * .75f
+                : g.coreDamage >= 200;
+            if (++bossIndex == 4) {
+              stage = 6;
+              running = false;
+            } else {
+              session->world = Game(false);
+              session->world.autoWaves = false;
+              key(SDL_SCANCODE_APOSTROPHE);
+              stage = 2;
+            }
+          }
+        }
+        if (wall > 40)
+          running = false;
+      }
       if (coreTest) {
         if (stage == 0 && wall > .3) {
           click(ui.launch());
@@ -775,7 +872,7 @@ inline int run(int argc, char** argv) {
           running = false;
       }
       if (test && !progressionTest && !frontierTest && !servicesTest && !manualTest && !radioTest &&
-          !plasmaTest && !enemyTest && !coreTest) {
+          !plasmaTest && !enemyTest && !coreTest && !bossTest) {
         if (stage == 9 && wall - stageAt > .15 && !roofShot) {
           capture = "06-round-roof.png";
           roofShot = true;
@@ -1421,7 +1518,7 @@ inline int run(int argc, char** argv) {
             else if (code == SDL_SCANCODE_RIGHT)
               bestiary.selected = (bestiary.selected + 1) % SpeciesCount;
             else if (code == SDL_SCANCODE_UP || code == SDL_SCANCODE_DOWN)
-              bestiary.selected = (bestiary.selected + 5) % SpeciesCount;
+              bestiary.selected = (bestiary.selected + 7) % SpeciesCount;
             else if (code == SDL_SCANCODE_RETURN || code == SDL_SCANCODE_KP_ENTER)
               bestiary.summon(*session, Species(bestiary.selected));
             continue;
@@ -1759,6 +1856,11 @@ inline int run(int argc, char** argv) {
         camera.eye = {7, session->baseHeight() + 5, -6};
         camera.target = session->gunPoint({0, 0, 1.4f});
       }
+      if (bossTest && stage == 5 && fixture >= 0) {
+        const auto& foe = session->world.foes[fixture];
+        camera.eye = {foe.x + 42, 42, foe.z - 40};
+        camera.target = {foe.x, 6, foe.z + (foe.type == Wyrm ? 18.f : 0.f)};
+      }
       Vec3 shake = session->criticalShake();
       camera.eye = camera.eye + shake;
       camera.target = camera.target + shake;
@@ -1819,6 +1921,19 @@ inline int run(int argc, char** argv) {
           << ",\n  \"pause_resume_and_main_menu\": " << (corePauseMenuPass ? "true" : "false")
           << ",\n  \"regeneration\": " << session->expedition.regeneration << "\n}\n";
       std::cout << "CORE " << (pass ? "PASS" : "FAIL") << " stage=" << stage << '\n';
+      return pass ? 0 : 1;
+    }
+    if (bossTest) {
+      bool pass = stage == 6 &&
+          std::all_of(bossSpawnChecks.begin(), bossSpawnChecks.end(), [](bool v) {return v;}) &&
+          std::all_of(bossActionChecks.begin(), bossActionChecks.end(), [](bool v) {return v;});
+      std::ofstream out(artifacts / "bosses-result.json");
+      out << "{\n  \"passed\": " << (pass ? "true" : "false") << ",\n  \"spawn\": [";
+      for (int i = 0; i < 4; ++i) out << (i ? ", " : "") << (bossSpawnChecks[i] ? "true" : "false");
+      out << "],\n  \"abilities\": [";
+      for (int i = 0; i < 4; ++i) out << (i ? ", " : "") << (bossActionChecks[i] ? "true" : "false");
+      out << "]\n}\n";
+      std::cout << "BOSSES " << (pass ? "PASS" : "FAIL") << '\n';
       return pass ? 0 : 1;
     }
     if (enemyTest) {

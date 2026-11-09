@@ -91,8 +91,10 @@ public:
   std::vector<OpaquePart> extraOpaque;
   std::vector<std::pair<ID3D11ShaderResourceView*, const std::vector<Instance>*>> extraSprites;
   std::array<Com<ID3D11ShaderResourceView>, SpeciesCount> textures;
-  std::array<float, SpeciesCount> aspect{1, 1, 1.5f, 1, 1.5f, 1, 1, 1, 1, 1};
+  std::array<float, SpeciesCount> aspect{};
   std::array<std::vector<Instance>, SpeciesCount> enemies;
+  Com<ID3D11ShaderResourceView> wormTexture;
+  std::vector<Instance> wormSegments;
   std::vector<Instance> boxes, tubes, glowBoxes, glowTubes, glowRocks, beams, hot, smoke, ringData,
       shadows, rocks, crystals, worldLetters, bossHealth, gunLetters;
   explicit GameScene(Renderer& r, const std::filesystem::path& assets) {
@@ -100,6 +102,12 @@ public:
     r.makeArsenalMeshes();
     r.groundRadius = WORLD_RADIUS;
     r.fogDensity = .0014f;
+    aspect.fill(1);
+    aspect[Brute] = aspect[Floater] = 1.5f;
+    aspect[Slime] = aspect[Devourer] = aspect[SiegeBoss] = 1.5f;
+    aspect[Wyrm] = 1312.f / 1199.f;
+    r.loadTexture(assets / "boss-wyrm-segment.png", wormTexture);
+    wormSegments.reserve(1024);
     for (int i = 0; i < SpeciesCount; ++i) {
       r.loadTexture(assets / SPECIES[i].texture, textures[i]);
       enemies[i].reserve(6000);
@@ -348,6 +356,18 @@ public:
   void prepare(const Game& g, const ViewState& view, bool commandDeck = false) {
     extraOpaque.clear();
     extraSprites.clear();
+    wormSegments.clear();
+    for (const auto& body : g.worms) {
+      if (!g.valid(body.head, body.generation))
+        continue;
+      const auto& head = g.foes[body.head];
+      for (int n = 0; n < 8; ++n) {
+        float size = 11.f - n * .45f;
+        Vec3 p = body.segments[n];
+        wormSegments.push_back(instance({p.x, size * .45f, p.z}, {size * aspect[Wyrm], size, 1},
+                                       head.flash > 0 ? Color{1.5f, 1.25f, 1.25f} : Color{1, 1, 1}));
+      }
+    }
     for (auto& v : enemies)
       v.clear();
     for (auto* v : {&boxes, &tubes, &glowBoxes, &glowTubes, &glowRocks, &beams, &hot, &smoke,
@@ -449,6 +469,14 @@ public:
         ringData.push_back(instance({e.x, .18f, e.z}, {BRAIN_RADIUS * 2, BRAIN_RADIUS * 2, 1},
                                     {.65f, .2f, 1}, 0, 0, .15f + .12f * std::sin(g.time * 3)));
       }
+      if (e.type == Devourer && e.absorbClock > 0) {
+        ringData.push_back(instance({e.x, .2f, e.z}, {100, 100, 1}, {.65f, .1f, .9f}, 0, 0, .22f));
+        hot.push_back(instance({e.x, e.size * .45f, e.z}, {8, 8, 1}, {.65f, .1f, 1}, 0, 0,
+                               .3f + .15f * std::sin(g.time * 9)));
+      }
+      if (e.summoner >= 0 && g.valid(e.summoner, e.summonerGeneration))
+        ringData.push_back(instance({e.x, .18f, e.z}, {e.size * 1.3f, e.size * 1.3f, 1},
+                                    {.8f, .2f, 1}, 0, 0, .7f));
       if (e.stun > 0)
         ringData.push_back(
             instance({e.x, .18f, e.z}, {e.size, e.size, 1}, {.3f, .65f, 1}, 0, 0, .8f));
@@ -514,6 +542,7 @@ public:
     r.draw(r.cube, glowBoxes, r.white, 6);
     r.draw(r.tube, glowTubes, r.white, 6);
     r.draw(r.rock, glowRocks, r.white, 6);
+    r.draw(r.quad, wormSegments, wormTexture, 1);
     for (int i = 0; i < SpeciesCount; ++i)
       r.draw(r.quad, enemies[i], textures[i], 1);
     r.draw(r.quad, bossHealth, r.white, 17);

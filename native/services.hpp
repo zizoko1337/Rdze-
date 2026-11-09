@@ -64,8 +64,8 @@ struct ServiceSystem {
         while (cast.pulses < 6 && cast.age + .00001f >= 3 + cast.pulses * .5f) {
           ++cast.pulses;
           ++g.brimstonePulses;
-          g.grid.radius(cast.position.x, cast.position.z, 10, g.foes,
-                        [&](int id) { g.hurt(id, 10000, Laser, false); });
+          g.blastTargets(cast.position, 10,
+                         [&](int id, float) { g.hurt(id, 10000, Laser, false); });
           g.ring(cast.position + Vec3{0, .25f, 0}, {1, .3f, .05f}, 10, .48f);
           g.sparks(cast.position + Vec3{0, 2, 0}, {1, .65f, .2f}, 14, 28);
         }
@@ -85,8 +85,8 @@ struct ServiceSystem {
             g.removeTower(found->x, found->z);
             e.releaseTower(type);
             ++g.overloadBlasts;
-            g.grid.radius(cast.position.x, cast.position.z, 40, g.foes,
-                          [&](int id) { g.hurt(id, 50000, Tesla, false); });
+            g.blastTargets(cast.position, 40,
+                           [&](int id, float) { g.hurt(id, 50000, Tesla, false); });
             g.sparks(cast.position + Vec3{0, 4, 0}, {1, .5f, .1f}, 90, 52);
             g.ring(cast.position + Vec3{0, .3f, 0}, {1, .4f, .1f}, 40, 1.5f);
             g.announce("Przeciążenie. Stanowisko jest wolne; technologia pozostaje odblokowana.");

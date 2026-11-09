@@ -1,9 +1,11 @@
-param([switch]$Rebuild)
+param([switch]$Rebuild, [string]$GameExecutable)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-if ($Rebuild -or !(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'build/rdzen-game.exe'))) {
+if (!$GameExecutable) { $GameExecutable = Join-Path $PSScriptRoot 'build/rdzen-game.exe' }
+if ($Rebuild -or !(Test-Path -LiteralPath $GameExecutable)) {
   & (Join-Path $PSScriptRoot 'build.ps1') -GameOnly
 }
+$GameExecutable = (Resolve-Path -LiteralPath $GameExecutable).Path
 $compiler = Join-Path $root '.toolchain/llvm-mingw-20261020-ucrt-x86_64/bin/clang++.exe'
 $stage = Join-Path $root 'artifacts/package-work'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -37,7 +39,7 @@ Fabryka jezdzikow odblokowywana jest karta ulepszenia.
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText((Join-Path $stage 'INSTRUKCJA.txt'), $instructions, $utf8)
 $files = @(
-  @{ Name='rdzen-game.exe'; Source=(Join-Path $PSScriptRoot 'build/rdzen-game.exe') },
+  @{ Name='rdzen-game.exe'; Source=$GameExecutable },
   @{ Name='SDL3.dll'; Source=(Join-Path $PSScriptRoot 'build/SDL3.dll') },
   @{ Name='SDL-LICENSE.txt'; Source=(Join-Path $root '.toolchain/SDL3-3.4.18/LICENSE.txt') },
   @{ Name='INSTRUKCJA.txt'; Source=(Join-Path $stage 'INSTRUKCJA.txt') }

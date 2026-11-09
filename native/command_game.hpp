@@ -47,6 +47,25 @@ inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range, flo
       result.distance = t;
     }
   });
+  // Segments share the head's health and ID; no extra AI entities or grid cells.
+  for (const auto& body : g.worms) {
+    if (!g.valid(body.head, body.generation))
+      continue;
+    for (int n = 0; n < 8; ++n) {
+      float size = 11.f - n * .45f;
+      Vec3 p = body.segments[n];
+      Vec3 delta = origin - Vec3{p.x, size * .45f, p.z};
+      float r = size * .43f + thickness, b = dot(delta, direction);
+      float d = b * b - dot(delta, delta) + r * r;
+      if (d < 0 || -b + std::sqrt(d) < 0)
+        continue;
+      float t = std::max(0.f, -b - std::sqrt(d));
+      if (t < result.distance) {
+        result.id = body.head;
+        result.distance = t;
+      }
+    }
+  }
   result.point = origin + direction * result.distance;
   return result;
 }

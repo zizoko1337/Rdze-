@@ -117,6 +117,8 @@ struct Frontier {
   }
   void processDeaths(Game& g) {
     for (const auto& death : g.deaths) {
+      if (!death.reward)
+        continue;
       bool boss = death.type >= Titan;
       if (boss || (death.elite && lootRandom.next() % 100 == 0)) {
         dropCrystal(death.position, boss);
@@ -193,11 +195,12 @@ struct Frontier {
     }
   }
   static float spawnHp(Species type, float time, bool elite = false) {
-    float scale = type == Crawler ? 1 : 1 + std::max(0.f, time - 120) / 1200;
+    float scale = type == Crawler || type >= Wyrm ? 1 : 1 + std::max(0.f, time - 120) / 1200;
     return SPECIES[type].hp * scale * (elite && type != Saboteur ? 4 : 1);
   }
   static float spawnSpeed(Species type, float time, bool elite = false) {
-    constexpr float speeds[] = {3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f};
+    constexpr float speeds[] = {3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f,
+                                WYRM_FORWARD_SPEED, 2.8f, 3, 2.8f};
     static_assert(std::size(speeds) == SpeciesCount);
     return (speeds[type] + (type <= Runner ? std::min(time / 120, 4.f) : 0)) *
            (elite && type != Saboteur ? .9f : 1.f);
@@ -242,7 +245,7 @@ struct Frontier {
       int id = g.boss();
       if (id >= 0) {
         auto& boss = g.foes[id];
-        boss.hp = boss.maxHp = (boss.type == Titan   ? 7000.f
+        boss.hp = boss.maxHp = boss.type >= Wyrm ? SPECIES[boss.type].hp : (boss.type == Titan   ? 7000.f
                                 : boss.type == Brain ? 8000.f
                                                      : 6000.f) +
                                bossesSpawned * 1500;

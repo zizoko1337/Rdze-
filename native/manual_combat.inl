@@ -101,9 +101,10 @@ void manualBlast(Vec3 point, float radius, float damage, Weapon source, int prim
   markTarget(primary >= 0 && world.foes[primary].hp > 0
                  ? primary
                  : world.grid.nearest(point.x, point.z, radius, world.foes));
-  world.grid.radius(point.x, point.z, radius, world.foes, [&](int id) {
+  world.blastTargets(point, radius, [&](int id, float) {
     // A ground blast reaches tall enemies but not a distant airborne centre.
-    if (length(world.targetPoint(id) - point) <= radius + world.foes[id].size * .25f)
+    if (world.foes[id].type == Wyrm ||
+        length(world.targetPoint(id) - point) <= radius + world.foes[id].size * .25f)
       manualHit(id, damage, source, false);
   });
   world.ring(point, WEAPONS[source].color, radius, .65f);
@@ -184,6 +185,35 @@ void fireRail() {
                           break;
                         }
                     });
+  // Include the worm body once in the piercing list, sharing the head's ID.
+  for (const auto& body : world.worms) {
+    if (!world.valid(body.head, body.generation))
+      continue;
+    float nearest = range;
+    for (int n = 0; n < 8; ++n) {
+      float size = 11.f - n * .45f;
+      auto p = body.segments[n];
+      Vec3 delta = origin - Vec3{p.x, size * .45f, p.z};
+      float r = size * .43f, b = dot(delta, direction);
+      float d = b * b - dot(delta, delta) + r * r;
+      if (d >= 0 && -b + std::sqrt(d) >= 0)
+        nearest = std::min(nearest, std::max(0.f, -b - std::sqrt(d)));
+    }
+    if (nearest >= range)
+      continue;
+    bool already = false;
+    for (auto& hit : hits)
+      if (hit.id == body.head) {
+        if (nearest < hit.distance)
+          hit = {body.head, nearest, origin + direction * nearest};
+        already = true;
+        break;
+      }
+    if (!already && nearest < hits.back().distance)
+      hits.back() = {body.head, nearest, origin + direction * nearest};
+    std::sort(hits.begin(), hits.end(),
+              [](const RayHit& a, const RayHit& b) { return a.distance < b.distance; });
+  }
   bool primary = true;
   for (const auto& hit : hits)
     if (hit.id >= 0) {

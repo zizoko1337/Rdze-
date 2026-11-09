@@ -45,6 +45,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Cooling tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Enemy test compilation failed.' }
 & (Join-Path $out 'enemy-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Enemy tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'boss_tests.cpp') '-o' (Join-Path $out 'boss-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Boss test compilation failed.' }
+& (Join-Path $out 'boss-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Boss tests failed.' }
 & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot 'core_tests.cpp') '-o' (Join-Path $out 'core-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Core test compilation failed.' }
 & (Join-Path $out 'core-tests.exe')

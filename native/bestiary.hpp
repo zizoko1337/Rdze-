@@ -11,7 +11,11 @@ inline constexpr const char* ENEMY_ROLES[] = {"RÓJ",
                                               "ARTYLERIA",
                                               "BOSS / SZTURM",
                                               "BOSS / PRZYWOŁANIE",
-                                              "BOSS / ZAKŁÓCENIA"};
+                                              "BOSS / ZAKŁÓCENIA",
+                                              "BOSS / ZYGZAK",
+                                              "BOSS / PODZIAŁ",
+                                              "BOSS / WCHŁANIANIE",
+                                              "BOSS / ARTYLERIA"};
 inline constexpr const char* ENEMY_BEHAVIOR[] = {
     "Atakuje rdzeń: 4 obrażenia/s.",
     "Szybki szturm. Rdzeń: 4 obrażenia/s.",
@@ -22,7 +26,11 @@ inline constexpr const char* ENEMY_BEHAVIOR[] = {
     "Zatrzymuje się na 63 m. Kwas: 45 obrażeń co 5 s + czas lotu.",
     "Rdzeń: 80 obrażeń/s. Co 6 s uderza za dodatkowe 30 obrażeń.",
     "Rdzeń: 80 obrażeń/s. Co 8 s przywołuje 5 łowców.",
-    "Co 6 s wyłącza wieżyczki na 4 s. Promień 42 m (2 heksy)."};
+    "Co 6 s wyłącza wieżyczki na 4 s. Promień 42 m (2 heksy).",
+    "Do rdzenia 3,2 m/s. Szeroki, szybki zygzak. Głowa i 8 segmentów, wspólne HP.",
+    "8000 -> 2 x 4000 -> 4 x 2000 HP. Razem 24000. Kryształ po całym podziale.",
+    "Przy 75/50/25% HP raz wchłania obecnych wrogów do 50 m i ich pozostałe HP.",
+    "Zasięg 63 m. Kwas: 200 obrażeń co 5 s + czas lotu."};
 static_assert(std::size(ENEMY_ROLES) == SpeciesCount && std::size(ENEMY_BEHAVIOR) == SpeciesCount);
 
 // No renderer dependency in spawn logic, allowing the actual menu action to be tested headlessly.
@@ -54,8 +62,8 @@ struct Bestiary {
     return made;
   }
   static Rect card(const GameUi& ui, int index) {
-    float width = (ui.width - 100) / 5;
-    return {50 + index % 5 * width, 153 + index / 5 * 323.f, width - 12, 309};
+    float width = (ui.width - 100) / 7;
+    return {50 + index % 7 * width, 153 + index / 7 * 323.f, width - 12, 309};
   }
   static Rect batch(const GameUi& ui, int index) {
     return {ui.width - 420 + index * 120.f, 88, 110, 41};
@@ -98,7 +106,7 @@ struct Bestiary {
       ui.panel(r, b);
       ui.rect(r, {b.x, b.y, b.w, 3}, selected == i ? c : Color{.11f, .19f, .23f});
       ui.text(r, b.x + 12, b.y + 14, ENEMY_ROLES[i], 10, c);
-      float imageHeight = 130, imageWidth = imageHeight * scene.aspect[i];
+      float imageHeight = 112, imageWidth = imageHeight * scene.aspect[i];
       float maxWidth = b.w - 30;
       if (imageWidth > maxWidth) {
         imageHeight *= maxWidth / imageWidth;
@@ -117,12 +125,12 @@ struct Bestiary {
                      1,
                      0};
       r.draw(r.quad, &image, 1, scene.textures[i], 16);
-      ui.text(r, b.x + 12, b.y + 170, SPECIES[i].name, 18, GameUi::white);
-      ui.text(r, b.x + 12, b.y + 201,
+      ui.text(r, b.x + 12, b.y + 155, SPECIES[i].name, 13, GameUi::white);
+      ui.text(r, b.x + 12, b.y + 181,
               "HP " + std::to_string(int(Frontier::spawnHp(type, s.world.time))) + "  |  " +
                   number(Frontier::spawnSpeed(type, s.world.time), 1) + " m/s",
-              13, c);
-      ui.paragraph(r, b.x + 12, b.y + 227, ENEMY_BEHAVIOR[i], int((b.w - 24) / 7), 12,
+              11, c);
+      ui.paragraph(r, b.x + 12, b.y + 207, ENEMY_BEHAVIOR[i], int((b.w - 24) / 6.5f), 11,
                    GameUi::muted);
       ui.text(r, b.x + 12, b.y + 285, "[LPM] PRZYWOŁAJ", 11, c);
     }

@@ -48,10 +48,15 @@ enum Species {
   Titan,
   Queen,
   Brain,
+  Wyrm,
+  Slime,
+  Devourer,
+  SiegeBoss,
   SpeciesCount
 };
 constexpr float SABOTAGE_TIME = 3, BRAIN_RADIUS = SUPPORT_SPACING * 2;
 constexpr float BRAIN_INTERVAL = 6, BRAIN_DISABLE = 4, SIEGE_RANGE = SUPPORT_SPACING * 3;
+constexpr float WYRM_FORWARD_SPEED = 3.2f, WYRM_LATERAL_SPEED = 32, WYRM_SWAY_FREQUENCY = 2.4f;
 struct Color {
   float r, g, b;
 };
@@ -175,7 +180,11 @@ inline constexpr SpeciesInfo SPECIES[] = {
     {"Plujec oblężniczy", "alien-siege-spitter.png", 900, 3, 8, 0},
     {"TYTAN BAZALTU", "boss-titan.png", 18000, 3.4f, 25, 0},
     {"KRÓLOWA ROJU", "boss-queen.png", 13500, 4.4f, 22, 2},
-    {"NADUMYSŁ", "boss-brain.png", 16000, 2.6f, 20, 3}};
+    {"NADUMYSŁ", "boss-brain.png", 16000, 2.6f, 20, 3},
+    {"ŻMIJ SEGMENTOWY", "boss-wyrm.png", 14000, WYRM_FORWARD_SPEED, 13, 0},
+    {"ŚLUZOWIEC", "boss-slime.png", 8000, 2.8f, 22, 0},
+    {"POŻERACZ", "boss-devourer.png", 12000, 3, 23, 0},
+    {"PLUJEC ALFA", "boss-siege.png", 15000, 2.8f, 24, 0}};
 static_assert(std::size(SPECIES) == SpeciesCount);
 struct Foe {
   float x = 0, z = 0, hp = 0, maxHp = 0, speed = 0, size = 0, altitude = 0, phase = 0;
@@ -186,11 +195,17 @@ struct Foe {
   Species type = Crawler;
   uint32_t generation = 0;
   bool elite = false;
+  uint32_t slimeFamily = 0;
+  uint8_t slimeStage = 0, feedUsed = 0, feedPending = 0;
+  float absorbClock = 0;
+  int summoner = -1;
+  uint32_t summonerGeneration = 0;
 };
 struct FoeDeath {
   Vec3 position;
   Species type;
   bool elite;
+  bool reward = true;
 };
 struct Tower {
   Weapon type = Laser;
@@ -302,6 +317,18 @@ public:
   std::vector<GasZone> gas;
   std::vector<RingFx> rings;
   std::vector<FoeDeath> deaths;
+  struct WormBody {
+    int head;
+    uint32_t generation;
+    std::array<Vec3, 8> segments;
+  };
+  struct SlimeFamily {
+    uint32_t id;
+    int alive;
+  };
+  std::vector<WormBody> worms;
+  std::vector<SlimeFamily> slimeFamilies;
+  uint32_t nextSlimeFamily = 0;
   bool recordDeaths = false, expeditionRules = false;
   std::vector<SupportLink> supportLinks;
   // Static aura buckets are rebuilt only when installations change, never per enemy/frame.
@@ -451,7 +478,8 @@ public:
     float range = weaponInfo(t).range;
     return dx * dx + dz * dz <= range * range;
   }
-  int spawn(Species species, float x, float z) {
+  int spawn(Species species, float x, float z, uint32_t family = 0, uint8_t slimeStage = 0,
+            float inheritedHp = 0) {
     if (freeIds.empty())
       return -1;
     int i = freeIds.back();
@@ -472,12 +500,36 @@ public:
     e.generation = gen;
     e.phase = random.unit() * 2 * PI;
     e.ability = 4 + random.unit() * 4;
+    if (species == SiegeBoss)
+      e.ability = 5;
+    if (species == Slime) {
+      e.slimeFamily = family ? family : ++nextSlimeFamily;
+      e.slimeStage = slimeStage;
+      e.hp = e.maxHp = inheritedHp > 0 ? inheritedHp : SPECIES[Slime].hp;
+      e.size *= std::pow(.7f, float(slimeStage));
+      e.speed *= std::pow(1.3f, float(slimeStage));
+      auto f = std::find_if(slimeFamilies.begin(), slimeFamilies.end(),
+                            [&](const SlimeFamily& a) { return a.id == e.slimeFamily; });
+      if (f == slimeFamilies.end())
+        slimeFamilies.push_back({e.slimeFamily, 1});
+      else
+        ++f->alive;
+    }
+    if (species == Wyrm) {
+      WormBody body{i, gen, {}};
+      Vec3 away = normalize(Vec3{x, 0, z});
+      if (length(away) < .1f)
+        away = {0, 0, 1};
+      for (int n = 0; n < 8; ++n)
+        body.segments[n] = Vec3{x, 0, z} + away * (7.f * (n + 1));
+      worms.push_back(body);
+    }
     active.push_back(i);
     return i;
   }
   int boss() {
-    constexpr Species bosses[] = {Titan, Queen, Brain};
-    Species type = bosses[bossSerial++ % 3];
+    constexpr Species bosses[] = {Titan, Queen, Brain, Wyrm, Slime, Devourer, SiegeBoss};
+    Species type = bosses[bossSerial++ % std::size(bosses)];
     float a = random.unit() * 2 * PI;
     int id = spawn(type, std::sin(a) * 225, std::cos(a) * 225);
     if (id >= 0)
@@ -564,6 +616,15 @@ public:
       amount *= 1 + focusDamageBonus;
     float actual = std::min(e.hp, amount);
     e.hp -= amount;
+    if (e.type == Devourer && e.hp > 0) {
+      for (int phase = 0; phase < 3; ++phase) {
+        uint8_t bit = uint8_t(1u << phase);
+        if (e.hp <= e.maxHp * (.75f - phase * .25f) && !(e.feedUsed & bit)) {
+          e.feedUsed |= bit;
+          e.feedPending |= bit;
+        }
+      }
+    }
     e.flash = .09f;
     if (trackWeapon) {
       damageDone[weapon] += actual;
@@ -571,10 +632,25 @@ public:
     }
     if (e.hp <= 0) {
       ++kills;
+      bool reward = true;
+      if (e.type == Slime) {
+        if (e.slimeStage < 2) {
+          for (float side : {-1.f, 1.f})
+            spawn(Slime, e.x + side * e.size * .35f, e.z + side * 2.f, e.slimeFamily,
+                  uint8_t(e.slimeStage + 1), e.maxHp * .5f);
+        }
+        auto family = std::find_if(slimeFamilies.begin(), slimeFamilies.end(),
+                                  [&](const SlimeFamily& a) { return a.id == e.slimeFamily; });
+        if (family != slimeFamilies.end()) {
+          reward = --family->alive == 0;
+          if (reward)
+            slimeFamilies.erase(family);
+        }
+      }
       if (recordDeaths && deaths.size() < MAX_FOES)
-        deaths.push_back({{e.x, .6f, e.z}, e.type, e.elite});
+        deaths.push_back({{e.x, .6f, e.z}, e.type, e.elite, reward});
       bool isBoss = e.type >= Titan;
-      if (isBoss) {
+      if (isBoss && reward) {
         ++bossKills;
         announce(std::string("Pokonano: ") + SPECIES[e.type].name);
         ring({e.x, .15f, e.z}, {1, .6f, .2f}, 35, 1.4f);
@@ -584,9 +660,25 @@ public:
     }
     return actual;
   }
-  void blast(Vec3 p, float radius, float damage, Weapon type) {
+  template <class Fn> void blastTargets(Vec3 p, float radius, Fn&& fn) {
     grid.radius(p.x, p.z, radius, foes, [&](int i) {
-      float d = std::hypot(foes[i].x - p.x, foes[i].z - p.z);
+      fn(i, std::hypot(foes[i].x - p.x, foes[i].z - p.z));
+    });
+    for (const auto& body : worms) {
+      if (!valid(body.head, body.generation))
+        continue;
+      const auto& head = foes[body.head];
+      if (std::hypot(head.x - p.x, head.z - p.z) <= radius)
+        continue; // Head was already visited; one hit per shared health pool.
+      float nearest = 1e30f;
+      for (const auto& segment : body.segments)
+        nearest = std::min(nearest, std::hypot(segment.x - p.x, segment.z - p.z));
+      if (nearest <= radius)
+        fn(body.head, nearest);
+    }
+  }
+  void blast(Vec3 p, float radius, float damage, Weapon type) {
+    blastTargets(p, radius, [&](int i, float d) {
       hurt(i, damage * (1 - .45f * d / radius), type);
     });
     auto color = WEAPONS[type].color;
@@ -884,6 +976,76 @@ public:
     }
     return true;
   }
+  void beginFeeding(int id) {
+    auto& boss = foes[id];
+    uint8_t bit = uint8_t(boss.feedPending & uint8_t(-int(boss.feedPending)));
+    boss.feedPending &= uint8_t(~bit);
+    boss.absorbClock = 8;
+    // Threshold events are rare. Scan live positions once, without stale grid cells,
+    // new entities, HP changes or allocations. Other bosses cannot be consumed.
+    for (int child : active) {
+      auto& minion = foes[child];
+      float dx = minion.x - boss.x, dz = minion.z - boss.z;
+      if (minion.hp <= 0 || minion.type >= Titan || dx * dx + dz * dz > 50 * 50)
+        continue;
+      if (valid(minion.summoner, minion.summonerGeneration) &&
+          foes[minion.summoner].absorbClock > 0)
+        continue;
+      minion.summoner = id;
+      minion.summonerGeneration = boss.generation;
+      minion.sabotage = 0;
+    }
+    ring({boss.x, .2f, boss.z}, {.8f, .12f, 1}, 50, 2);
+    sparks(targetPoint(id), {.7f, .1f, 1}, 22, 15);
+  }
+  bool absorbMinion(Foe& minion, float dt) {
+    if (!valid(minion.summoner, minion.summonerGeneration)) {
+      minion.summoner = -1;
+      return false;
+    }
+    auto& boss = foes[minion.summoner];
+    if (boss.absorbClock <= 0) {
+      minion.summoner = -1;
+      return false;
+    }
+    // Two seconds to kill the offerings before the pull begins.
+    if (boss.absorbClock > 6 || boss.stun > 0 || minion.glued > 0)
+      return true;
+    float dx = boss.x - minion.x, dz = boss.z - minion.z;
+    float distance = std::hypot(dx, dz), mouth = boss.size * .28f;
+    if (distance <= mouth + .05f) {
+      boss.hp = std::min(boss.maxHp, boss.hp + minion.hp);
+      beam({minion.x, minion.size * .4f, minion.z}, targetPoint(minion.summoner),
+           {.65f, .2f, 1}, .5f, .35f);
+      minion.hp = 0; // Absorption is not a kill and cannot create loot.
+    } else {
+      float amount = std::min(distance - mouth, 14.f * dt *
+                              movementSlowAt(minion.x, minion.z) *
+                              (minion.toxicSlow > 0 ? .5f : 1.f));
+      minion.x += dx / distance * amount;
+      minion.z += dz / distance * amount;
+    }
+    return true;
+  }
+  void updateWorms() {
+    for (size_t n = 0; n < worms.size();) {
+      auto& body = worms[n];
+      if (!valid(body.head, body.generation)) {
+        body = worms.back();
+        worms.pop_back();
+        continue;
+      }
+      Vec3 previous{foes[body.head].x, 0, foes[body.head].z};
+      for (auto& segment : body.segments) {
+        Vec3 delta = segment - previous;
+        float distance = length(delta);
+        if (distance > 7)
+          segment = previous + delta * (7 / distance);
+        previous = segment;
+      }
+      ++n;
+    }
+  }
   void step(float dt) {
     if (paused || dt <= 0)
       return;
@@ -944,20 +1106,38 @@ public:
         e.sabotage = 0;
       if (e.hp <= 0 || stunned)
         continue;
+      if (e.summoner >= 0 && absorbMinion(e, dt))
+        continue;
+      if (e.type == Devourer) {
+        e.absorbClock = std::max(0.f, e.absorbClock - dt);
+        if (e.absorbClock <= 0 && e.feedPending)
+          beginFeeding(i);
+      }
       if (e.type == Saboteur && sabotageTower(e, dt))
         continue;
       float distance = std::hypot(e.x, e.z);
       float stop = CORE_RADIUS + e.size * .25f + 1;
       if (e.type == Spitter)
         stop = 48;
-      if (e.type == SiegeSpitter)
+      if (e.type == SiegeSpitter || e.type == SiegeBoss)
         stop = SIEGE_RANGE;
       if (distance > stop) {
         float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : 1.f);
-        float amount = e.glued > 0 ? 0 : std::min(distance - stop, e.speed * slow * dt);
-        e.x -= e.x / distance * amount;
-        e.z -= e.z / distance * amount;
-      } else if (e.type != Spitter && e.type != SiegeSpitter)
+        float amount = e.glued > 0 || e.absorbClock > 0
+                           ? 0 : std::min(distance - stop, e.speed * slow * dt);
+        if (e.type == Wyrm) {
+          float lateral = amount > 0 ? std::sin(time * WYRM_SWAY_FREQUENCY + e.phase) *
+              WYRM_LATERAL_SPEED * slow * dt * (e.speed / WYRM_FORWARD_SPEED) : 0;
+          // Rotate around the core independently of inward movement. A wide sway
+          // must neither speed up the advance nor push the boss away from the core.
+          float angle = std::atan2(e.x, e.z) + lateral / distance;
+          e.x = std::sin(angle) * (distance - amount);
+          e.z = std::cos(angle) * (distance - amount);
+        } else {
+          e.x -= e.x / distance * amount;
+          e.z -= e.z / distance * amount;
+        }
+      } else if (e.type != Spitter && e.type != SiegeSpitter && e.type != SiegeBoss)
         coreDamage += dt * (e.type >= Titan ? 80 : e.elite ? 8 : 4);
       if (e.type == Brain && e.ability <= 0) {
         e.ability = BRAIN_INTERVAL;
@@ -995,15 +1175,18 @@ public:
         beam(targetPoint(i), {0, CORE_HEIGHT * .5f, 0}, {.35f, 1, .1f}, .3f, .2f);
         coreDamage += e.elite ? 50 : 25;
       }
-      if (e.type == SiegeSpitter && distance <= SIEGE_RANGE + .1f && e.ability <= 0) {
+      if ((e.type == SiegeSpitter || e.type == SiegeBoss) && distance <= SIEGE_RANGE + .1f &&
+          e.ability <= 0) {
         e.ability = 5;
         // A bounded pool of ballistic acid projectiles, rather than hits every frame.
         if (enemyShots.size() < 512)
           enemyShots.push_back(
-              {targetPoint(i), 0, std::max(.8f, distance / 35), e.elite ? 90.f : 45.f});
+              {targetPoint(i), 0, std::max(.8f, distance / 35),
+               e.type == SiegeBoss ? 200.f : e.elite ? 90.f : 45.f});
         sparks(targetPoint(i), {.4f, 1, .08f}, 4, 3);
       }
     }
+    updateWorms();
     if (supportDirty)
       rebuildSupport();
     for (size_t n = 0; n < enemyShots.size();) {
