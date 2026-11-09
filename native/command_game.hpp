@@ -4,6 +4,7 @@
 #include "frontier.hpp"
 #include "services.hpp"
 #include "manual_arsenal.hpp"
+#include "jukebox.hpp"
 
 namespace command {
 using namespace arsenal;
@@ -22,18 +23,18 @@ struct Input {
   bool fast = false, fire = false;
 };
 
-inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range) {
+inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range, float thickness = 0) {
   direction = normalize(direction);
   RayHit result{-1, range, origin + direction * range};
   // Limit to ground first, then query only cells touched by the ray's bounding disc.
   if (direction.y < -.00001f && origin.y > 0)
     result.distance = std::min(result.distance, -origin.y / direction.y);
   Vec3 middle = origin + direction * (result.distance * .5f);
-  float radius = std::hypot(direction.x, direction.z) * result.distance * .5f + 16;
+  float radius = std::hypot(direction.x, direction.z) * result.distance * .5f + 16 + thickness;
   g.grid.radius(middle.x, middle.z, radius, g.foes, [&](int i) {
     const auto& foe = g.foes[i];
     Vec3 delta = origin - g.targetPoint(i);
-    float r = foe.size * .43f;
+    float r = foe.size * .43f + thickness;
     float b = dot(delta, direction), c = dot(delta, delta) - r * r;
     float discriminant = b * b - c;
     if (discriminant < 0)
@@ -67,9 +68,14 @@ public:
   ServiceSystem services;
   bool terminalOpen = false;
   bool servicesOpen = false;
+  bool radioOpen = false;
+  bool upgradeLabOpen = false;
+  bool bestiaryOpen = false;
+  RadioState radio;
   Service serviceTarget = Service::None;
   float deckClock = 0, buttonAge = 3;
   static constexpr Vec3 START_BUTTON{0, CORE_HEIGHT + 1.2f, 8.3f};
+  static constexpr Vec3 URANIUM_PUMP{0, CORE_HEIGHT + .2f, -10.5f};
   bool tactical = false;
   int sentryStock = 0;
   std::deque<Weapon> sentryInventory;
@@ -82,20 +88,78 @@ public:
   float lift = 0, hatch = 0, transition = 0, cooldown = 0, recoil = 0, spin = 0, spinSpeed = 0;
   float hitFlash = 0, spawnTimer = 3, shotFlash = 0;
   float flatDamage = 0, frostClock = 0;
+  float barrelHeat = 0, coolantClock = 0;
+  bool coolantActive = false;
   uint64_t shots = 0, impacts = 0;
   std::vector<Bullet> bullets;
   std::vector<ManualProjectile> manualProjectiles;
   std::vector<ToxicPatch> toxicPatches;
   int smartTarget = -1;
   uint32_t smartGeneration = 0;
-  float smartClock = 0, lanceCharge = 0, lanceRemaining = 0, lanceFxClock = 0;
+  int smartCandidate = -1;
+  uint32_t smartCandidateGeneration = 0;
+  float smartSince = 0, smartLock = 0;
+  bool teslaSupport = false;
+  static constexpr float TESLA_BUFF_DURATION = 10;
+  float smartClock = 0, lanceCharge = 0, lanceRemaining = 0;
+  bool lanceActive = false, lanceReserveActive = false, flameFocused = false;
+  float flameMorph = 0;
+  ToxinCycle toxinCycle() const {
+    float p = shots == 0 ? 1
+                         : std::clamp(1 - cooldown / (module.interval() / module.rateMultiplier),
+                                      0.f, 1.f);
+    auto ease = [](float t) {
+      t = std::clamp(t, 0.f, 1.f);
+      return t * t * (3 - 2 * t);
+    };
+    float lift = p < .25f   ? 1
+                 : p < .4f  ? 1 - ease((p - .25f) / .15f)
+                 : p < .78f ? 0
+                            : ease((p - .78f) / .14f);
+    return {p, lift, shots == 0 ? 1 : std::clamp((p - .4f) / .38f, 0.f, 1.f),
+            p < .23f ? 1.05f * (1 - p / .23f) : 0, shots > 0 && p >= .4f && p < .78f};
+  }
+  int coreWarningLevel() const {
+    float ratio = expedition.hp / expedition.maxHp;
+    return ratio > .5f ? 0 : ratio > .2f ? 1 : 2;
+  }
+  Vec3 criticalShake() const {
+    if (!expedition.enabled || !expedition.miningStarted || blocked() || tactical ||
+        mode == Mode::Selection || expedition.hp >= expedition.maxHp * .2f)
+      return {};
+    float t = world.time,
+          amplitude = .014f + .025f * (1 - expedition.hp / (expedition.maxHp * .2f));
+    return {std::sin(t * 41) * amplitude, std::sin(t * 53 + 1) * amplitude * .6f,
+            std::sin(t * 37 + 2) * amplitude * .5f};
+  }
+  std::vector<uint32_t> lanceTouched = std::vector<uint32_t>(MAX_FOES, 0);
+  float flameRange() const { return flameFocused ? 94.5f : 63.f; }
+  float flameHalfAngle() const { return flameFocused ? std::atan(2.5f / 94.5f) : .5f; }
+  bool toggleFlame() {
+    if (module.kind != Gun::Flame || module.dualFlame || mode != Mode::Mounted || tactical ||
+        blocked())
+      return false;
+    flameFocused = !flameFocused;
+    return true;
+  }
+  bool toggleManualMode() {
+    if (module.kind == Gun::Arc && module.teslaAmplifier && mode == Mode::Mounted && !tactical &&
+        !blocked()) {
+      teslaSupport = !teslaSupport;
+      return true;
+    }
+    return toggleFlame();
+  }
+  float sniperDamageAt(float meters) const {
+    return manualDamage() * (1 + meters * (module.doubleRangeBonus ? .02f : .01f));
+  }
   static constexpr float SMART_HALF_X = .24f, SMART_HALF_Y = .15f;
   Random random;
   explicit Session(bool gameplay = false, bool running = false) : expedition(gameplay, running) {
     world.autoWaves = false;
     world.recordDeaths = world.expeditionRules = gameplay;
-    bullets.reserve(256);
-    manualProjectiles.reserve(64);
+    bullets.reserve(1024);
+    manualProjectiles.reserve(1024);
     toxicPatches.reserve(32);
     sentryDrops.reserve(SLOT_COUNT);
   }
@@ -104,8 +168,8 @@ public:
   }
   bool placingSentry() const { return tactical && sentryStock > 0; }
   bool blocked() const {
-    return world.paused || terminalOpen || servicesOpen || serviceTarget != Service::None ||
-           expedition.dead() || placingSentry();
+    return world.paused || terminalOpen || servicesOpen || radioOpen || upgradeLabOpen ||
+           bestiaryOpen || serviceTarget != Service::None || expedition.dead() || placingSentry();
   }
   bool nearConsole(float side) const {
     if (mode != Mode::Walking || !expedition.enabled || tactical)
@@ -120,15 +184,34 @@ public:
     return expedition.enabled && !expedition.miningStarted && mode == Mode::Walking && !tactical &&
            length(delta) < 2.8f && dot(normalize(delta), forward()) > .4f;
   }
-  bool chooseUpgrade(int index) {
+  bool nearRadio() const {
+    if (!expedition.enabled || !expedition.miningStarted || buttonAge < 3.45f ||
+        mode != Mode::Walking || tactical)
+      return false;
+    Vec3 delta = Vec3{START_BUTTON.x, CORE_HEIGHT + 1.7f, START_BUTTON.z - .55f} - player;
+    return length(delta) < 3.2f && dot(normalize(delta), forward()) > .45f;
+  }
+  bool chooseUpgrade(int index, bool debug = false) {
     if (!terminalOpen || expedition.dead() || expedition.rewards.empty() || index < 0 || index >= 3)
       return false;
     Upgrade kind = expedition.rewards.front().choices[index];
-    if (!expedition.eligible(kind)) {
+    bool debugTower = debug && isTower(kind) && expedition.acquiredTowers() < SLOT_COUNT;
+    if (!expedition.eligible(kind) && !debugTower) {
       expedition.validateFront();
       return false;
     }
     Rarity rarity = expedition.rewards.front().rarities[index];
+    if (requiredManualGun(kind) != Gun::Count &&
+        (requiredManualGun(kind) != module.kind || rarity != Rarity::Legendary))
+      return false;
+    if (kind == Upgrade::PlasmaMortar && (module.kind != Gun::Pulse || rarity != Rarity::Legendary))
+      return false;
+    if (kind == Upgrade::ExtremeCooling &&
+        (module.kind != Gun::Crank || rarity != Rarity::Legendary))
+      return false;
+    if (kind == Upgrade::UraniumReserve &&
+        (module.kind != Gun::Lance || rarity != Rarity::Legendary))
+      return false;
     float power = RARITIES[int(rarity)].power;
     if (isTower(kind)) {
       ++sentryStock;
@@ -142,6 +225,8 @@ public:
       module.rateMultiplier += .2f * power;
     if (kind == Upgrade::Mining)
       expedition.miningMultiplier += .25f * power;
+    if (kind == Upgrade::Nanobots)
+      expedition.regeneration += power;
     if (kind == Upgrade::Hull) {
       expedition.maxHp += 250 * power;
       expedition.hp = std::min(expedition.maxHp, expedition.hp + 250 * power);
@@ -166,6 +251,26 @@ public:
       expedition.roverRate = std::min(24.f, expedition.roverRate + (int(rarity) + 1) * .1f);
     if (kind == Upgrade::ServiceCredit)
       ++expedition.servicePoints;
+    if (kind == Upgrade::PlasmaMortar)
+      module.plasma = true;
+    if (kind == Upgrade::ExtremeCooling)
+      module.extremeCooling = true;
+    if (kind == Upgrade::UraniumReserve)
+      module.uraniumReserve = true;
+    if (kind == Upgrade::TeslaAmplifier)
+      module.teslaAmplifier = true;
+    if (kind == Upgrade::PlasmaGlue)
+      module.plasmaGlue = true;
+    if (kind == Upgrade::BouncyMortar)
+      module.bouncyMortar = true;
+    if (kind == Upgrade::InstantLock)
+      module.instantLock = true;
+    if (kind == Upgrade::DoubleRangeBonus)
+      module.doubleRangeBonus = true;
+    if (kind == Upgrade::DualFlame) {
+      module.dualFlame = true;
+      flameFocused = false;
+    }
     ++expedition.levels[size_t(kind)];
     ++expedition.selected;
     expedition.rewards.pop_front();
@@ -173,6 +278,32 @@ public:
     world.announce(isTower(kind) ? "Wybierz wolny heks. LPM zamawia zrzut, Tab wraca na pokład."
                                  : std::string("Zainstalowano: ") + UPGRADES[size_t(kind)].name);
     return true;
+  }
+  bool debugGrant(Upgrade kind, Rarity rarity) {
+    if (kind < Upgrade::Damage || kind >= Upgrade::Count || expedition.dead())
+      return false;
+    if (requiredManualGun(kind) != Gun::Count && requiredManualGun(kind) != module.kind)
+      return false;
+    if (kind == Upgrade::PlasmaMortar && module.kind != Gun::Pulse)
+      return false;
+    if (kind == Upgrade::ExtremeCooling && module.kind != Gun::Crank)
+      return false;
+    if (kind == Upgrade::UraniumReserve && module.kind != Gun::Lance)
+      return false;
+    rarity = std::max(rarity, minimumRarity(kind));
+    if (kind == Upgrade::ServiceCredit)
+      rarity = Rarity::Rare;
+    if (kind == Upgrade::FlatDamage || kind == Upgrade::Luck)
+      rarity = Rarity::Common;
+    bool oldTerminal = terminalOpen;
+    expedition.rewards.push_front(
+        {0, {kind, Upgrade::Mining, Upgrade::Hull}, {rarity, rarity, rarity}});
+    terminalOpen = true;
+    bool applied = chooseUpgrade(0, true);
+    if (!applied)
+      expedition.rewards.pop_front();
+    terminalOpen = oldTerminal;
+    return applied;
   }
   bool chooseService(int choice) {
     if (!servicesOpen || !expedition.miningStarted || expedition.dead() ||
@@ -306,13 +437,22 @@ public:
             -p.x * std::sin(gunYaw) + p.z * std::cos(gunYaw)};
   }
   Vec3 muzzle() const {
-    if (module.kind == Gun::Howitzer || module.kind == Gun::Toxin)
+    if (module.kind == Gun::Pulse && module.plasma)
+      return plasmaMuzzle(7);
+    if (module.kind == Gun::Toxin)
+      return gunPoint({1.45f, .65f, 2.25f});
+    if (module.kind == Gun::Howitzer)
       return gunPoint({1.5f, .12f, 3.2f});
     if (module.kind == Gun::Smart)
       return gunPoint({shots % 2 ? -1.15f : 1.15f, .1f, 2.5f});
     if (module.kind == Gun::Flame)
-      return gunPoint({.9f, -.15f, 3.2f});
+      return gunPoint({.9f, -.15f, 3.2f + flameMorph * 1.1f});
     return gunPoint({0, 0, 3.2f});
+  }
+  Vec3 plasmaMuzzle(int emitter) const {
+    emitter = PlasmaSpec::emitterForImpulse(emitter);
+    return gunPoint(
+        {float(emitter % 5 - 2) * .32f, .45f, .9f + float(emitter / 5) * .42f - recoil * .23f});
   }
   bool nearSeat() const {
     Vec3 d = Vec3{0, player.y, 0} - player;
@@ -321,6 +461,10 @@ public:
   }
   void start(Gun gun) {
     module.kind = gun;
+    expedition.manualLaser = gun == Gun::Pulse;
+    expedition.manualMinigun = gun == Gun::Crank;
+    expedition.manualLance = gun == Gun::Lance;
+    expedition.manualKind = gun;
     mode = Mode::Walking;
     world.autoWaves = false;
     world.announcementUntil = 0;
@@ -353,6 +497,10 @@ public:
     return true;
   }
   bool interact() {
+    if (radioOpen) {
+      radioOpen = false;
+      return true;
+    }
     if (servicesOpen) {
       servicesOpen = false;
       return true;
@@ -367,6 +515,11 @@ public:
       return false;
     if (nearStartButton())
       return startExtraction();
+    if (nearRadio()) {
+      radioOpen = true;
+      cancelAim();
+      return true;
+    }
     if (nearTerminal()) {
       expedition.validateFront();
       terminalOpen = true;
@@ -457,25 +610,37 @@ public:
     }
     for (float side : {-1.f, 1.f}) {
       float cx = side * 6.8f, cz = -3.5f;
-      if (std::abs(player.x - cx) < 1.9f && std::abs(player.z - cz) < 1.1f) {
-        float dx = player.x - cx, dz = player.z - cz;
-        if (1.9f - std::abs(dx) < 1.1f - std::abs(dz))
-          player.x = cx + (dx < 0 ? -1.9f : 1.9f);
+      float angle = std::atan2(cx, cz), c = std::cos(angle), sn = std::sin(angle);
+      float dx = (player.x - cx) * c - (player.z - cz) * sn;
+      float dz = (player.x - cx) * sn + (player.z - cz) * c;
+      if (std::abs(dx) < 1.9f && std::abs(dz) < 1.25f) {
+        if (1.9f - std::abs(dx) < 1.25f - std::abs(dz))
+          dx = dx < 0 ? -1.9f : 1.9f;
         else
-          player.z = cz + (dz < 0 ? -1.1f : 1.1f);
+          dz = dz < 0 ? -1.25f : 1.25f;
+        player.x = cx + dx * c + dz * sn;
+        player.z = cz - dx * sn + dz * c;
       }
     }
-    if (expedition.enabled && (!expedition.miningStarted || buttonAge < 1.6f)) {
+    float pumpX = player.x - URANIUM_PUMP.x, pumpZ = player.z - URANIUM_PUMP.z;
+    if (expedition.enabled && std::abs(pumpX) < 2.75f && std::abs(pumpZ) < 1.25f) {
+      if (2.75f - std::abs(pumpX) < 1.25f - std::abs(pumpZ))
+        player.x = URANIUM_PUMP.x + (pumpX < 0 ? -2.75f : 2.75f);
+      else
+        player.z = URANIUM_PUMP.z + (pumpZ < 0 ? -1.25f : 1.25f);
+    }
+    if (expedition.enabled) {
       float dx = player.x - START_BUTTON.x, dz = player.z - START_BUTTON.z;
       float d = std::hypot(dx, dz);
-      if (d < .85f) {
+      float collisionRadius = expedition.miningStarted ? 1.4f : .85f;
+      if (d < collisionRadius) {
         if (d < .001f) {
           dx = 1;
           dz = 0;
           d = 1;
         }
-        player.x = START_BUTTON.x + dx / d * .85f;
-        player.z = START_BUTTON.z + dz / d * .85f;
+        player.x = START_BUTTON.x + dx / d * collisionRadius;
+        player.z = START_BUTTON.z + dz / d * collisionRadius;
       }
     }
   }
@@ -485,6 +650,12 @@ public:
     if (mode != Mode::Mounted || cooldown > .00001f || blocked() || tactical ||
         module.kind == Gun::Lance)
       return;
+    if (module.kind == Gun::Pulse && module.plasma && manualProjectiles.size() + 20 > 1024)
+      return;
+    if (module.kind == Gun::Toxin && toxinCycle().lift < .999f)
+      return;
+    if (module.kind == Gun::Crank && bullets.size() >= 1024)
+      return;
     if (module.kind == Gun::Smart) {
       updateSmartTarget();
       if (!world.valid(smartTarget, smartGeneration))
@@ -493,13 +664,15 @@ public:
     if ((module.kind == Gun::Howitzer || module.kind == Gun::Toxin || module.kind == Gun::Smart) &&
         manualProjectiles.size() >= 64)
       return;
-    cooldown = std::max(-.05f, cooldown) + s.interval / std::max(.1f, module.rateMultiplier);
+    cooldown = std::max(-.05f, cooldown) + module.interval() / std::max(.1f, module.rateMultiplier);
     recoil = 1;
     shotFlash = .09f;
     ++shots;
     ++world.fired[s.audio];
     Vec3 direction = forward();
-    if (module.kind == Gun::Pulse) {
+    if (module.kind == Gun::Pulse && module.plasma) {
+      firePlasmaMortar();
+    } else if (module.kind == Gun::Pulse) {
       RayHit hit = trace(world, eye(), direction, s.range);
       world.beam(muzzle(), hit.point, s.color, .12f, .16f);
       world.beam(muzzle(), hit.point, {1, 1, 1}, .035f, .1f);
@@ -521,6 +694,12 @@ public:
       Vec3 endpoint = module.kind == Gun::Smart ? world.targetPoint(smartTarget) : groundAim();
       ManualProjectile p{module.kind, muzzle(), muzzle(), muzzle(), endpoint, {}};
       p.damage = manualDamage();
+      p.glue = module.kind == Gun::Toxin && module.plasmaGlue;
+      p.arcHeight = module.kind == Gun::Toxin ? 25 : 40;
+      if (module.kind == Gun::Howitzer && module.bouncyMortar) {
+        p.bounces = 2;
+        p.bounceDirection = normalize(Vec3{endpoint.x - p.start.x, 0, endpoint.z - p.start.z});
+      }
       p.duration = std::clamp(length(endpoint - p.start) / s.speed, .6f, 5.f);
       if (module.kind == Gun::Smart) {
         p.target = smartTarget;
@@ -532,17 +711,17 @@ public:
       manualProjectiles.push_back(p);
     } else {
       Vec3 right = normalize(cross({0, 1, 0}, direction)), up = cross(direction, right);
-      float a = random.unit() * 2 * PI,
-            radius = std::sqrt(random.unit()) * s.spread * module.spreadMultiplier;
+      float a = random.unit() * 2 * PI, radius = std::sqrt(random.unit()) * module.spread();
       // Converge on the center sight, then perturb direction inside a cone. No target lock.
       Vec3 aim = trace(world, eye(), direction, s.range).point;
       Vec3 d = normalize(normalize(aim - muzzle()) + right * (std::cos(a) * radius) +
                          up * (std::sin(a) * radius));
-      if (bullets.size() < 256)
+      if (bullets.size() < 1024)
         bullets.push_back({muzzle(), muzzle(), d * s.speed, s.range / s.speed,
                            s.damage * module.damageMultiplier + flatDamage});
       world.particle(gunPoint({.7f, -.25f, 0}), right * 3 + Vec3{0, 2, 0}, {1, .7f, .25f}, .09f,
                      .6f);
+      barrelHeat = std::min(1.f, barrelHeat + .0125f);
     }
   }
   void step(float dt, const Input& input = {}) {
@@ -550,8 +729,9 @@ public:
       return;
     dt = std::min(dt, .05f);
     deckClock += dt;
+    flameMorph += (float(flameFocused) - flameMorph) * std::min(1.f, dt * 12);
     if (expedition.miningStarted)
-      buttonAge = std::min(3.f, buttonAge + dt);
+      buttonAge = std::min(5.f, buttonAge + dt);
     move(input, dt);
     transition += dt;
     if (mode == Mode::Raising) {
@@ -587,10 +767,14 @@ public:
     services.step(world, expedition, dt);
     stepToxicPatches(dt);
     world.step(dt);
+    for (auto type : world.destroyedTowers)
+      expedition.releaseTower(type);
+    world.destroyedTowers.clear();
     size_t rewardsBefore = expedition.rewards.size();
+    float damagedHp = std::max(0.f, expedition.hp - std::max(0.f, world.coreDamage - damageBefore));
     expedition.step(dt, world.coreDamage - damageBefore);
     if (expedition.levels[size_t(Upgrade::Purge)] > 0 && !expedition.purgeUsed &&
-        expedition.hp <= expedition.maxHp * .5f) {
+        damagedHp <= expedition.maxHp * .5f) {
       expedition.purgeUsed = true;
       for (int id : world.active) {
         auto& foe = world.foes[id];
@@ -621,8 +805,15 @@ public:
       smartClock = .08f;
     }
     stepLance(dt, input.fire);
-    if (input.fire)
-      fire();
+    if (input.fire) {
+      for (int burst = 0; burst < 16 && cooldown <= .00001f; ++burst) {
+        auto before = shots;
+        fire();
+        if (shots == before)
+          break;
+      }
+    }
+    stepMinigunCooling(dt, input.fire && mode == Mode::Mounted && !tactical);
     stepManualProjectiles(dt);
     for (size_t i = 0; i < bullets.size();) {
       auto& b = bullets[i];

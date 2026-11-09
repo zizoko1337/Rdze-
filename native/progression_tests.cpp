@@ -31,10 +31,14 @@ int main() {
   try {
     {
       Expedition e(true, true), lucky(true, true), normal(true, true);
+      // Catalogue coverage includes both starters; Session gates a real run to its selected gun.
+      e.manualMinigun = true;
+      e.manualLance = true;
       lucky.luck = 100;
       std::array<int, 5> counts{};
       std::array<bool, size_t(Upgrade::Count)> seen{};
-      for (int i = 0; i < 10000; ++i) {
+      for (int i = 0; i < 50000; ++i) {
+        e.manualKind = Gun(i % GUN_COUNT);
         auto base = normal.rollRarity(), improved = lucky.rollRarity();
         require(improved >= base, "Luck made a draw worse");
         ++counts[int(base)];
@@ -71,8 +75,8 @@ int main() {
       require(std::any_of(first.rewards.front().choices.begin(),
                           first.rewards.front().choices.end(), isTower),
               "First payout does not introduce defence");
-      std::cout
-          << "PASS five rarities, all 29 cards reachable, unique choices and monotonic luck\n";
+      std::cout << "PASS five rarities, all " << int(Upgrade::Count)
+                << " cards reachable, unique choices and monotonic luck\n";
     }
     {
       Session s(true, true);
@@ -122,7 +126,8 @@ int main() {
         tick(base, 16);
         tick(upgraded, 16);
         double a = base.world.damageDone[w], b = upgraded.world.damageDone[w];
-        require(a > 0 && std::abs(b / a - 1.2) < .015,
+        // The new fixed poison-status bonus is deliberately not a tower-damage multiplier.
+        require(a > 0 && (w == Venom ? b > a * 1.05 && b < a * 1.2 : std::abs(b / a - 1.2) < .015),
                 "Tower damage bonus fails on a weapon, projectile or DOT");
       }
       Session base(true, true), boosted(true, true);
@@ -161,14 +166,13 @@ int main() {
       install(s, Upgrade::Luck, Rarity::Common);
       require(s.module.damageMultiplier == 1.75f && s.flatDamage == 1 && s.expedition.luck == 1,
               "Rarity-scaled or minor manual bonuses incorrect");
-      install(s, Upgrade::Radar);
       install(s, Upgrade::Frost, Rarity::Rare);
       install(s, Upgrade::Focus, Rarity::Rare);
       install(s, Upgrade::Purge, Rarity::Epic);
-      for (auto u : {Upgrade::Radar, Upgrade::Frost, Upgrade::Focus, Upgrade::Purge})
+      for (auto u : {Upgrade::Frost, Upgrade::Focus, Upgrade::Purge})
         require(!s.expedition.eligible(u), "Unique module can be acquired twice");
       s.expedition.rewards.clear();
-      s.expedition.rewards.push_back({1, {Upgrade::Radar, Upgrade::Frost, Upgrade::Purge}});
+      s.expedition.rewards.push_back({1, {Upgrade::Focus, Upgrade::Frost, Upgrade::Purge}});
       s.expedition.validateFront();
       for (auto u : s.expedition.rewards.front().choices)
         require(s.expedition.eligible(u), "Stale unique module still offered");
@@ -251,7 +255,7 @@ int main() {
         s.world.foes[id].poison = 1;
         s.world.foes[id].poisonDps = 22;
         tick(s, .5f);
-        require(std::abs(s.world.damageDone[Venom] - before - 11 * multiplier) < .01,
+        require(std::abs(s.world.damageDone[Venom] - before - 21 * multiplier) < .01,
                 "Poison ignores marked vulnerability");
         before = s.world.damageDone[Sniper];
         s.world.hurt(other, 100, Sniper);

@@ -91,10 +91,10 @@ public:
   std::vector<OpaquePart> extraOpaque;
   std::vector<std::pair<ID3D11ShaderResourceView*, const std::vector<Instance>*>> extraSprites;
   std::array<Com<ID3D11ShaderResourceView>, SpeciesCount> textures;
-  std::array<float, SpeciesCount> aspect{1, 1, 1.5f, 1, 1.5f, 1, 1};
+  std::array<float, SpeciesCount> aspect{1, 1, 1.5f, 1, 1.5f, 1, 1, 1, 1, 1};
   std::array<std::vector<Instance>, SpeciesCount> enemies;
   std::vector<Instance> boxes, tubes, glowBoxes, glowTubes, glowRocks, beams, hot, smoke, ringData,
-      shadows, rocks, crystals;
+      shadows, rocks, crystals, worldLetters, bossHealth, gunLetters;
   explicit GameScene(Renderer& r, const std::filesystem::path& assets) {
     extraOpaque.reserve(8);
     r.makeArsenalMeshes();
@@ -111,6 +111,8 @@ public:
     smoke.reserve(22000);
     ringData.reserve(2000);
     shadows.reserve(MAX_FOES + MAX_TOWERS);
+    worldLetters.reserve(1024);
+    bossHealth.reserve(128);
     rocks.reserve(3500);
     crystals.reserve(300);
     Random random;
@@ -147,10 +149,13 @@ public:
          std::acos(std::clamp(d.y / len, -1.f, 1.f)), glow);
   }
   void makeTower(const Tower& t, float time, bool preview = false, bool valid = true) {
-    (void)time;
     const auto& w = WEAPONS[t.type];
     float h = w.height;
     Color steel{.60f, .69f, .73f}, dark{.16f, .22f, .25f}, accent = w.color;
+    if (t.disabledUntil > time) {
+      steel = {.28f, .24f, .33f};
+      accent = {.14f, .06f, .2f};
+    }
     if (preview) {
       steel = dark = accent = valid ? Color{.15f, .8f, .55f} : Color{.9f, .14f, .18f};
     }
@@ -346,11 +351,32 @@ public:
     for (auto& v : enemies)
       v.clear();
     for (auto* v : {&boxes, &tubes, &glowBoxes, &glowTubes, &glowRocks, &beams, &hot, &smoke,
-                    &ringData, &shadows})
+                    &ringData, &shadows, &worldLetters, &bossHealth, &gunLetters})
       v->clear();
     core(g.time, commandDeck);
-    for (const auto& t : g.towers)
+    for (const auto& t : g.towers) {
       makeTower(t, g.time);
+      if (t.disabledUntil > g.time) {
+        ringData.push_back(instance({t.x, .2f, t.z}, {8, 8, 1}, {.8f, .25f, 1}, 0, 0, .8f));
+        smoke.push_back(
+            instance({t.x, WEAPONS[t.type].height, t.z}, {4, 5, 1}, {.5f, .1f, .8f}, 0, 0, .35f));
+      }
+      if (t.amplifiedUntil > g.time) {
+        float h = WEAPONS[t.type].height;
+        for (int k = 0; k < 4; ++k) {
+          float a = g.time * 8 + k * PI * .5f;
+          Vec3 p{t.x + std::sin(a) * 1.2f, h * .4f, t.z + std::cos(a) * 1.2f};
+          Vec3 q{t.x - std::sin(a) * .5f, h + .6f, t.z - std::cos(a) * .5f};
+          beams.push_back(lineInstance(p, q, {.35f, .65f, 1}, .09f));
+        }
+      }
+    }
+    for (const auto& shot : g.enemyShots) {
+      Vec3 pos = shot.position(shot.age / shot.duration);
+      hot.push_back(instance(pos, {1.5f, 1.5f, 1}, {.4f, 1, .08f}));
+      beams.push_back(lineInstance(shot.position(std::max(0.f, (shot.age - .08f) / shot.duration)),
+                                   pos, {.3f, .9f, .08f}, .3f));
+    }
     for (auto link : g.supportLinks) {
       const auto& source = g.towers[link.source];
       const auto& target = g.towers[link.target];
@@ -404,12 +430,31 @@ public:
       enemies[e.type].push_back(
           instance({e.x, height * .48f + altitude + bob, e.z},
                    {width * (1 + std::sin(g.time * 5 + e.phase) * .015f), height, 1}, color));
+      if (e.type >= Titan)
+        bossHealth.push_back(instance({e.x, height + altitude + bob + 1.5f, e.z},
+                                      {height * .85f, .75f, 1}, {1, .18f, .12f}, 0, 0,
+                                      std::clamp(e.hp / e.maxHp, 0.f, 1.f)));
       if (e.elite)
         ringData.push_back(instance({e.x, .16f, e.z}, {e.size * 1.3f, e.size * 1.3f, 1},
                                     {1, .6f, .15f}, 0, 0, .65f));
+      if (e.type == Saboteur && e.sabotage > 0) {
+        hot.push_back(instance({e.x, 1.5f, e.z}, {2, 3, 1}, {1, .4f, .05f}, 0, 0,
+                               .25f + e.sabotage / SABOTAGE_TIME * .5f));
+        auto t = std::find_if(g.towers.begin(), g.towers.end(),
+                              [&](const Tower& tower) { return tower.id == e.towerTarget; });
+        if (t != g.towers.end())
+          beams.push_back(lineInstance({e.x, 2, e.z}, {t->x, 2, t->z}, {1, .3f, .04f}, .2f));
+      }
+      if (e.type == Brain) {
+        ringData.push_back(instance({e.x, .18f, e.z}, {BRAIN_RADIUS * 2, BRAIN_RADIUS * 2, 1},
+                                    {.65f, .2f, 1}, 0, 0, .15f + .12f * std::sin(g.time * 3)));
+      }
       if (e.stun > 0)
         ringData.push_back(
             instance({e.x, .18f, e.z}, {e.size, e.size, 1}, {.3f, .65f, 1}, 0, 0, .8f));
+      if (e.glued > 0)
+        shadows.push_back(
+            instance({e.x, .12f, e.z}, {e.size * 1.5f, e.size, 1}, {.08f, .2f, .025f}, 0, 0, .7f));
       shadows.push_back(
           instance({e.x, .06f, e.z}, {width * .9f, height * .55f, 1}, {0, 0, 0}, 0, 0, .45f));
       if (e.burn > 0) {
@@ -471,12 +516,15 @@ public:
     r.draw(r.rock, glowRocks, r.white, 6);
     for (int i = 0; i < SpeciesCount; ++i)
       r.draw(r.quad, enemies[i], textures[i], 1);
+    r.draw(r.quad, bossHealth, r.white, 17);
     for (const auto& batch : extraSprites)
       r.draw(r.quad, *batch.second, batch.first, 1);
     r.draw(r.quad, ringData, r.white, 10);
     r.draw(r.quad, smoke, r.white, 9);
     r.draw(r.quad, beams, r.white, 7);
     r.draw(r.quad, hot, r.white, 8);
+    r.draw(r.quad, worldLetters, r.font, 15);
+    r.draw(r.quad, gunLetters, r.font, 18);
   }
 };
 } // namespace arsenal

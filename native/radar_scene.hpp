@@ -1,25 +1,31 @@
 #pragma once
 #include "command_game.hpp"
 #include "game_scene.hpp"
+#include "deck_instruments.hpp"
 
 namespace command {
-inline constexpr Vec3 RADAR_TV_POSITION{0, CORE_HEIGHT + 3.35f, 7.5f};
+inline constexpr Vec3 RADAR_TV_POSITION{6.4951905f, CORE_HEIGHT + 3.35f, 3.75f};
+inline Vec3 radarLocal(float x, float z, float heading) {
+  float c = std::cos(heading), s = std::sin(heading);
+  return {x * c - z * s, 0, x * s + z * c};
+}
 inline void appendRadarTelevision(GameScene& scene, const Session& s) {
-  if (!s.expedition.enabled || s.expedition.levels[size_t(Upgrade::Radar)] == 0 ||
-      s.mode == Mode::Selection)
+  if (!s.expedition.enabled || s.mode == Mode::Selection)
     return;
   const Vec3 tv = RADAR_TV_POSITION;
-  Color frame{.16f, .23f, .26f}, green{.25f, .9f, .6f};
+  InstrumentFrame frame{scene, tv, PI / 3};
+  Color steel{.16f, .23f, .26f}, green{.25f, .9f, .6f};
   for (float side : {-1.f, 1.f}) {
     float x = side * 1.8f;
-    scene.rod({x, Session::roofHeight(std::hypot(x, tv.z)) - .18f, tv.z}, {x, tv.y + .95f, tv.z},
-              .055f, frame);
-    scene.box({x, tv.y + .94f, tv.z}, {.28f, .14f, .4f}, frame);
+    Vec3 hook = frame.point({x, 0, 0});
+    frame.rod({x, Session::roofHeight(std::hypot(hook.x, hook.z)) - .18f - tv.y, 0}, {x, .95f, 0},
+              .055f, steel);
+    frame.box({x, .94f, 0}, {.28f, .14f, .4f}, steel);
   }
-  scene.box(tv, {4.8f, 1.9f, .35f}, frame);
-  scene.box(tv + Vec3{0, 0, -.2f}, {4.48f, 1.6f, .035f}, {.015f, .055f, .065f}, 0, 0, true);
+  frame.box({0, 0, 0}, {4.8f, 1.9f, .35f}, steel);
+  frame.box({0, 0, -.2f}, {4.48f, 1.6f, .035f}, {.015f, .055f, .065f}, true);
   auto pixel = [&](float x, float y, float w, float h, Color color, float depth = -.25f) {
-    scene.box(tv + Vec3{x, y, depth}, {w, h, .012f}, color, 0, 0, true);
+    frame.box({x, y, depth}, {w, h, .012f}, color, true);
   };
   constexpr float cx = -.95f, radius = .65f;
   for (int k = -2; k <= 2; ++k) {
@@ -30,7 +36,8 @@ inline void appendRadarTelevision(GameScene& scene, const Session& s) {
   pixel(cx, sweep, 2 * radius, .014f, {.08f, .35f, .25f}, -.27f);
   auto contact = [&](float x, float z, float size, Color color) {
     float distance = std::max(350.f, std::hypot(x, z));
-    pixel(cx + x / distance * radius, z / distance * radius, size, size, color, -.29f);
+    auto local = radarLocal(x, z, s.yaw);
+    pixel(cx + local.x / distance * radius, local.z / distance * radius, size, size, color, -.29f);
   };
   for (const auto& t : s.world.towers)
     contact(t.x, t.z, .025f, green);
@@ -41,7 +48,7 @@ inline void appendRadarTelevision(GameScene& scene, const Session& s) {
               foe.type >= Titan ? Color{1, .6f, .15f} : Color{1, .18f, .2f});
   }
   for (int i = 1; i <= 10; ++i)
-    contact(std::sin(s.gunYaw) * i * 10, std::cos(s.gunYaw) * i * 10, .015f, {.2f, .8f, 1});
+    contact(std::sin(s.yaw) * i * 10, std::cos(s.yaw) * i * 10, .015f, {.2f, .8f, 1});
   contact(0, 0, .06f, green);
   for (const auto& rover : s.frontier.rovers)
     contact(rover.position.x, rover.position.z, .018f, {.3f, 1, .9f});

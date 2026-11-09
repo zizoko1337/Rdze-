@@ -22,11 +22,16 @@ Po wejsciu na platforme uruchom wydobycie czerwonym przyciskiem za dzialem [E].
 Lewy komputer: ulepszenia. Prawy: jednorazowe uslugi za punkty z niebieskich kart.
 1-9 wybor jednego z 9 dzial manualnych, Enter start; WASD chodzenie; mysz rozgladanie.
 E fotel / komputer / wyjscie z dziala. LPM strzelanie.
+; laboratorium ulepszen: wyszukiwanie, Tab rzadkosc, Enter dodaj, Esc zamknij.
+' bestiariusz: grafiki, statystyki, klikniecie przywoluje; x1/x10/x100. Czas stoi.
 Tab widok z gory. LPM heks: dostawa dziala; LPM krysztal: wyslij drona.
 C dron po najblizszy krysztal. P pauza. F1 pomoc. F11 pelny ekran.
 R nowa ekspedycja. Alt+F4 wyjscie.
+Radio wyjezdza po schowaniu przycisku. E przy radiu: utwory, pauza i glosnosc.
 
 Uran daje wybor ulepszenia przy bocznym komputerze. Boss co 3 minuty.
+Rdzen regeneruje 3 HP/s. Nanoboty regenerujace zwiekszaja regeneracje.
+Pompa naprzeciw radia pokazuje wydobycie i stabilnosc (procent HP rdzenia).
 Fabryka jezdzikow odblokowywana jest karta ulepszenia.
 '@
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -39,6 +44,9 @@ $files = @(
 )
 foreach ($asset in (Get-ChildItem -LiteralPath (Join-Path $root 'public/assets') -File | Sort-Object Name)) {
   $files += @{ Name=('public/assets/' + $asset.Name); Source=$asset.FullName }
+}
+foreach ($track in (Get-ChildItem -LiteralPath (Join-Path $root 'public/music') -Filter '*.mp3' -File | Sort-Object Name)) {
+  $files += @{ Name=('public/music/' + $track.Name); Source=$track.FullName }
 }
 $stream = [IO.File]::Create((Join-Path $stage 'payload.bin'))
 $writer = New-Object IO.BinaryWriter($stream)
@@ -76,7 +84,16 @@ try {
 } finally { Pop-Location }
 Copy-Item -LiteralPath (Join-Path $stage 'INSTRUKCJA.txt') -Destination (Join-Path $root 'INSTRUKCJA_EXE.txt') -Force
 $zip = Join-Path $root 'Rdzen-prototyp.zip'
-Compress-Archive -LiteralPath $output,(Join-Path $root 'INSTRUKCJA_EXE.txt') -DestinationPath $zip -Force
+for ($taskAttempt = 0; $taskAttempt -lt 5; $taskAttempt++) {
+  try {
+    # Antivirus scanning can briefly hold the freshly linked executable open.
+    Compress-Archive -LiteralPath $output,(Join-Path $root 'INSTRUKCJA_EXE.txt'),(Join-Path $root 'Uruchom-Linux.sh'),(Join-Path $root 'LINUX.txt') -DestinationPath $zip -Force -ErrorAction Stop
+    break
+  } catch {
+    if ($taskAttempt -eq 4) { throw }
+    Start-Sleep -Seconds 1
+  }
+}
 @{ bundle_id=$bundleId; exe_sha256=(Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash; files=$manifest } |
   ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'artifacts/package-manifest.json') -Encoding UTF8
 Write-Output "READY: $output"

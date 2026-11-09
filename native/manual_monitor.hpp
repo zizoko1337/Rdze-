@@ -79,8 +79,15 @@ public:
   void draw(Renderer& r, const Session& s) {
     if (s.module.kind == Gun::Flame && s.mode == Mode::Mounted && !s.tactical) {
       // One ground quad; the shader clips it against the real 3D flame cone and 63m range.
-      auto footprint = instance(s.eye(), {126, 126, 1}, {1, .32f, .045f}, s.gunYaw, s.gunPitch);
+      float range = s.flameRange();
+      auto footprint = instance(s.eye(), {range * 2, range * 2, std::cos(s.flameHalfAngle())},
+                                {1, .32f, .045f}, s.gunYaw, s.gunPitch);
       r.draw(r.quad, &footprint, 1, r.white, 14);
+      if (s.module.dualFlame) {
+        auto focused = instance(s.eye(), {189, 189, std::cos(std::atan(2.5f / 94.5f))},
+                                {1, .65f, .15f}, s.gunYaw, s.gunPitch);
+        r.draw(r.quad, &focused, 1, r.white, 14);
+      }
     }
     if (!valid || s.module.kind != Gun::Rail || s.tactical)
       return;

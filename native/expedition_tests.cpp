@@ -58,7 +58,8 @@ int main() {
       int id = s.world.spawn(Crawler, 0, 15.9f);
       s.world.foes[id].speed = 0;
       tick(s, 1);
-      require(std::abs(s.expedition.hp - 1496) < .1f, "Enemy damage not applied to core");
+      require(std::abs(s.expedition.hp - 1499) < .1f,
+              "Enemy damage / base regeneration not applied to core");
       s.world.paused = true;
       float hp = s.expedition.hp, uranium = s.expedition.uranium;
       tick(s, 1);

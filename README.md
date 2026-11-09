@@ -18,7 +18,9 @@ Jeśli używasz tego samego konta GitHub, na drugim komputerze wystarczy klonowa
 
 Kliknij **Rdzen.exe** lub **START.bat**. Wybierz jeden z dziewięciu modułów manualnych (myszą albo 1–9), następnie naciśnij **Enter** lub przycisk rozpoczęcia ekspedycji. Broń platformy wydobywającej uran z obcej planety w roku 2137.
 
-Zaczynasz na pokładzie rdzenia, pod dachem centrum dowodzenia. **Najpierw obejdź działo i podejdź do czerwonego przycisku za nim. E uruchamia wydobycie i napór przeciwników.** Przycisk wciska się, podstawka zjeżdża pod pokład, a zapadnia zamyka się nad nią. Przed uruchomieniem możesz spokojnie chodzić po platformie; czas ekspedycji i wydobycie stoją.
+Zaczynasz na pokładzie rdzenia, pod dachem centrum dowodzenia. **Najpierw obejdź działo i podejdź do czerwonego przycisku za nim. E uruchamia wydobycie i napór przeciwników.** Przycisk wciska się i zjeżdża pod pokład. Zapadnia pozostaje otwarta, a z jej wnętrza wyjeżdża **cyber-jukebox URANIUM FM 2137**. Przed uruchomieniem możesz spokojnie chodzić po platformie; czas ekspedycji i wydobycie stoją.
+
+Po wysunięciu radia muzyka rusza automatycznie. Na urządzeniu widać stację i nazwę utworu; membrany i wskaźniki reagują na odtwarzany dźwięk. Podejdź i naciśnij **E**: strzałki lewo/prawo zmieniają utwór, **Spacja** wstrzymuje/wznawia, **-/+** zmieniają głośność. Te same funkcje są dostępne myszą. E/Esc zamyka panel. Na razie jest jedna stacja z czterema dostarczonymi utworami. [Opis radia](JUKEBOX.md).
 
 Podejdź do fotela na środku. Gdy patrzysz na stanowisko z bliska, pojawia się **Press E to control**. Naciśnij **E**: zajmiesz fotel, właz w dachu się rozsunie, a platforma z działem podniesie się o 10 m.
 
@@ -30,7 +32,7 @@ Rdzeń zaczyna z **1500 HP**, wydobywa **2 jednostki uranu/s**, a pasek mieści 
 
 Po wypłatę podejdź do **lewego komputera** na platformie. Popatrz na niego z bliska i naciśnij **E**. Zielona lampka miga, jeśli są dostępne nagrody, a mały ekran pokazuje ich liczbę. Wybierz kartę **1/2/3** lub kliknięciem. Karta jest natychmiast instalowana, a terminal się zamyka. **E/Esc** pozwala wyjść bez wybierania; propozycje pozostają takie same. Wypłaty mogą czekać w kolejce. Otwarcie terminala zatrzymuje walkę, wydobycie i lot transportowca. **Prawy komputer służy osobno do jednorazowych usług.**
 
-Jest **29 rodzajów kart** i pięć rzadkości: **Common, Uncommon, Rare, Epic, Legendary**. Kolor i nazwa rzadkości są widoczne na karcie, a opis podaje faktyczną wielkość bonusu. Zamknięcie komputera nie zmienia propozycji ani ich rzadkości. Pierwsza wypłata zawsze zawiera przynajmniej jedną propozycję nowej wieżyczki bojowej.
+Jest **38 rodzajów kart** i pięć rzadkości: **Common, Uncommon, Rare, Epic, Legendary**. Kolor i nazwa rzadkości są widoczne na karcie, a opis podaje faktyczną wielkość bonusu. Zamknięcie komputera nie zmienia propozycji ani ich rzadkości. Pierwsza wypłata zawsze zawiera przynajmniej jedną propozycję nowej wieżyczki bojowej.
 
 Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy wsparcia**. Liczba egzemplarzy wybranego typu może rosnąć aż do wspólnego limitu 210 stanowisk. Po wybraniu czterech typów bojowych pozostałe typy bojowe znikają z losowania; wsparcie ma osobny limit dwóch typów.
 
@@ -44,7 +46,7 @@ Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy ws
 | Rozwój obrony automatycznej | Premia do obrażeń, tempa lub zasięgu wszystkich obecnych i przyszłych wieżyczek |
 | Wydobycie i pancerz | Szybsze wydobycie albo większe maksymalne HP z naprawą |
 | Drobne bonusy Common | +1 obrażenie manualne lub +1% szczęścia zwiększającego szansę lepszej rzadkości |
-| Radar | Panel i telewizor zawieszony pod dachem, z pozycjami bestii, wieżyczek i kierunkiem działa; promień 350 m |
+| Radar (domyślny) | Mały panel HUD i telewizor pod dachem od początku. Zasięg 350 m; kierunek patrzenia zawsze u góry. Karta radaru została usunięta. |
 | Impulsy kriogeniczne | Spowolnienie narasta wraz ze zbliżaniem się bestii do rdzenia, w promieniu 85 m |
 | Wspólny cel | Manualne trafienie oznacza cel na 3 s; wieżyczki w zasięgu przełączają na niego ostrzał. Cel otrzymuje +0/10/20/30/40% obrażeń zależnie od rzadkości |
 | Awaryjne oczyszczenie | Raz na ekspedycję, przy 50% HP: zabija zwykłe bestie i zadaje bossom 50% ich maksymalnego HP |
@@ -58,7 +60,7 @@ Przekaźniki wzmacniają aktualne parametry bojowego sąsiada o 20%, także ład
 
 ### Heksy i zrzuty wieżyczek
 
-**Jednorazowe usługi:** Brimstone po 3 s zadaje 3000 obrażeń/s przez 3 s w promieniu 10 m; fala po 3 s ogłusza wszystkich obecnych przeciwników na 5 s; przeciążenie po 3 s poświęca wybraną wieżyczkę i zadaje 8000 obrażeń na jej heksie. Każda kosztuje 1 punkt. Wybór celu zatrzymuje czas, a PPM/Esc/Tab anuluje go bez straty punktu. Zniszczony heks można ponownie zabudować; wybrana technologia pozostaje w limicie 4+2. [Szczegółowe zasady](USLUGI.md).
+**Jednorazowe usługi:** Brimstone po 3 s zadaje sześć impulsów po 10 000 obrażeń (co 0,5 s) w promieniu 10 m; fala po 3 s ogłusza wszystkich obecnych przeciwników na 5 s; przeciążenie po 3 s poświęca wybraną wieżyczkę i zadaje 50 000 obrażeń w promieniu 40 m. Każda kosztuje 1 punkt. Wybór celu zatrzymuje czas, a PPM/Esc/Tab anuluje go bez straty punktu. Zniszczony heks można ponownie zabudować; wybrana technologia pozostaje w limicie 4+2. [Szczegółowe zasady](USLUGI.md).
 
 Wokół rdzenia jest **210 stanowisk na regularnej siatce heksagonalnej**, tworzącej duży sześciokąt z wolnym środkiem na platformę. Odstęp między stanowiskami wynosi **21 metrów**. Po wybraniu karty dowolnej wieżyczki automatycznie przechodzisz do widoku taktycznego. **LPM na wolnym heksie** zamawia dostawę. Podgląd pokazuje właściwy model i jego aktualny zasięg, wraz z bonusami. Miejsce zostaje zarezerwowane, a wieżyczka opada na linach pod balonem. Po około **6 sekundach** ląduje i zaczyna strzelać. Balon odczepia liny, uruchamia napęd i szybko wraca w górę.
 
@@ -74,17 +76,25 @@ Obsługa działa ma lekką bezwładność kamery: krótki, płynny dojazd do kie
 
 ## Dziewięć modułów manualnych
 
+Zwykły minigun ma stopniowo czerwieniejące końcówki luf. Jego przemiana **Legendary: Extreme Cooling System** dodaje kriogeniczne dysze z mgiełką przy gorących lufach, **bazową szybkostrzelność x5 (60/s)** i **rozrzut x2**. Wcześniejsze premie nadal działają. Testowo dodaj ją przez ; i wyszukaj „cooling”. [Opis chłodzenia](EXTREME_COOLING.md).
+
+Laser i minigun są podstawowymi działami startowymi; pozostałe odblokowania dojdą później. Laser otrzymał jednorazową przemianę **Legendary: Laserowy moździerz** (eksperymentalna technologia plazmowa). Głowica ma 17 widocznych emiterów i strzela łukiem salwami o łącznej sile 20 zwykłych impulsów lasera, rozłożonymi w promieniu 10 m. Bazowo daje 3000 nominalnych obrażeń na salwę przy niezmienionej szybkostrzelności.
+
+**; otwiera laboratorium wszystkich 38 ulepszeń**: wyszukiwanie, wybór rzadkości i dodawanie do bieżącego podejścia bez zużywania nagród. Enter dodaje kartę, Tab zmienia rzadkość, strzałki/kółko przewijają, ; lub Esc zamyka panel. [Zasady plazmy i laboratorium](PLAZMA_LAB.md).
+
+**' (apostrof) otwiera bestiariusz** z grafikami, statystykami i przywoływaniem po 1, 10 lub 100 przeciwników. Czas stoi podczas wyboru. Nowe bestie: elita sabotażysta niszczący wieżyczkę po 3 s, oblężniczy plujec strzelający z 63 m i boss Nadumysł wyłączający wieżyczki impulsami na obszarze dwóch heksów. [Mechanika, testy i grafiki](BESTIARIUSZ.md).
+
 | Broń | Parametry | Zachowanie |
 | --- | --- | --- |
 | Laser impulsowy | 150 obrażeń, 1 strzał/s, zasięg 500 m | Precyzyjna pojedyncza wiązka. Trafienie zabija podstawowego pełzacza jednym strzałem. |
 | Minigun korbowy | 26 obrażeń/pocisk, 12 pocisków/s, zasięg do 420 m | Pociski lecą z prędkością 210 m/s, mają rozrzut i niewielki opad. Obracają się lufy i boczna korbka; widać odrzut i wyrzucane łuski. |
-| Tesla / łańcuch | 340 obrażeń na cel, co 3,2 s, 440 m | Pierwszy cel wymaga trafienia. Do 9 kolejnych skoków po 28 m, bez powtarzania celów. |
-| Toksyczny granatnik | Co 2,8 s, 360 m | Lot łukiem; plama o promieniu 14 m utrzymuje się 8 s i zadaje 65 DPS, spowalniając o 50%. |
+| Tesla / łańcuch | 340 obrażeń na cel, co 3,2 s, 440 m | Trafienie bezpośrednie: do 10 celów. Trafienie ziemi: do 9 celów od punktu uderzenia. Skoki 56 m, bez powtarzania celów. |
+| Toksyczna katapulta | Co 2,8 s, 360 m | Lot łukiem; plama o promieniu 14 m utrzymuje się 8 s i zadaje 65 DPS, spowalniając o 50%. |
 | Moździerz boczny | 1100 obrażeń, co 3,5 s, 460 m | Lufa po prawej; pocisk leci łukiem i po dolocie wybucha w promieniu 15 m. Podgląd trajektorii i czasu dolotu. |
-| Rakiety / Smart | 180 obrażeń, co 0,32 s, 500 m | Wybierają cel najbliżej środka okienka, lecą po zakrzywionej trasie i wybuchają w promieniu 9 m. Bez celu nie strzelają. |
-| Lanca próżniowa | 640 DPS, 550 m | Przytrzymaj LPM: ładowanie 1,8 s, wiązka przez 3 s, chłodzenie 2 s. Puszczenie przerywa ładowanie lub ostrzał. |
+| Rakiety / Smart | 180 obrażeń, co 0,32 s, 500 m | Namierzają przez 0,5 s cel najbliżej środka okienka, potem lecą po zakrzywionej trasie i wybuchają w promieniu 9 m. Bez celu nie strzelają. |
+| Lanca próżniowa | 640 DPS + 200 przy pierwszym kontakcie, 550 m | Przytrzymaj LPM: ładowanie 1,8 s, wiązka przez 3 s, chłodzenie 2 s. Puszczenie przerywa ładowanie lub ostrzał. |
 | Snajper / Railgun | 750 bazowych obrażeń × (1 + dystans w m / 100), co 2,4 s, 750 m | Przebija do ośmiu przeciwników; każdy otrzymuje własny bonus dystansu. Ekran na broni pokazuje rzeczywisty widok z celownika w zbliżeniu około 8,3×. |
-| Miotacz / Piekło | 240 DPS, 63 m | Stożek o kącie około 57°, zasięg trzech odstępów heksów; podpalenie 30 DPS przez 3 s. Podświetlenie ziemi pokazuje obszar działania, jego krawędzie i odstępy co 21 m. |
+| Miotacz / Piekło | 240 DPS; PPM: 63 m szeroko / 94,5 m wąsko (5 m) | Stożek o kącie około 57°, zasięg trzech odstępów heksów; podpalenie 30 DPS przez 3 s. Podświetlenie ziemi pokazuje obszar działania, jego krawędzie i odstępy co 21 m. |
 
 Wszystkie dziewięć modułów jest obecnie dostępnych od początku. Laser trafia pierwszego przeciwnika na linii celowania; minigun może chybić. Wyjątkiem od ręcznego celowania są rakiety Smart oraz kolejne skoki Tesli. Kolorowy błysk celownika sygnalizuje trafienie. Amunicja jest nieograniczona. Modele, animacje i celowniki modułów są różne; fotel i winda pozostają wspólne. [Pełny opis i testy](DZIALA_MANUALNE.md).
 
@@ -130,7 +140,7 @@ Utrata aktywności okna pauzuje grę i zwalnia spust. P wznawia. Podczas podnosz
 ## Pozostałe tryby
 
 - **POLIGON_ROZWOJU.bat** — szybka próba: 4 typy bojowe do rozmieszczenia przez Tab i 5 gotowych wypłat przy komputerze. Dwie pierwsze pozwalają wybrać wsparcie, następne moduły rdzenia i premie. Wydobycie wynosi 8 uranu/s, rdzeń ma 20 000 HP. To osobny wariant testowy; zwykły START.bat zachowuje standardowy początek.
-- **POLIGON_EKSPEDYCJI.bat** — szybki dostęp do nowego etapu: start od 2:30, boss za 30 s aktywnego czasu, cztery działa w magazynie i sześć gotowych wyborów, w tym fabryka jeździków, radar oraz rozwój produkcji. Rdzeń ma 20 000 HP. Normalny START.bat zaczyna od zera.
+- **POLIGON_EKSPEDYCJI.bat** — szybki dostęp do nowego etapu: start od 2:30, boss za 30 s aktywnego czasu, cztery działa w magazynie i sześć gotowych wyborów, w tym fabryka jeździków, nanoboty oraz rozwój produkcji. Rdzeń ma 20 000 HP. Normalny START.bat zaczyna od zera.
 - **ARSENAL.bat** — wcześniejszy poligon dziewięciu automatycznych wieżyczek, budowanie z góry, gatunki bestii i bossowie. [Instrukcja arsenału](ARSENAL.md).
 - **TEST_NATYWNY.bat / BENCHMARK.bat** — oddzielne laboratorium dużej liczby jednostek i pocisków. [Metodologia](native/README.md), [historyczne wyniki](WYNIKI_WYDAJNOSCI.md).
 - **WEB_PROTOTYP.bat** — starszy prototyp przeglądarkowy. Polecenia npm dotyczą tylko tej wersji.
@@ -153,10 +163,20 @@ Pierwszy etap: `native/expedition.hpp` — wydobycie, transporty i kolejka kart;
 
 **TEST_OBRAZU.bat** sprawdza renderowanie podczas ciągłego strzelania i obrotów kamery, również przy przełączaniu pełnego ekranu. Raporty: `artifacts/render/`. [Opis poprawki migotania i zakres sprawdzeń](POPRAWKA_OBRAZU.md).
 
-**TEST_ROZWOJU.bat** sprawdza nowy terminal z rzadkościami, wybór Tesli, pauzę rozmieszczania, dostawę właściwego typu i ostrzał oraz radar. Raporty i zrzuty: `artifacts/command/upgrades/`. `progression-tests.exe`, uruchamiany przy przebudowie, sprawdza losowanie 29 kart, szczęście, 210 mieszanych dostaw, rzeczywiste bonusy wszystkich broni i moduły rdzenia.
+**TEST_ROZWOJU.bat** sprawdza nowy terminal z rzadkościami, wybór Tesli, pauzę rozmieszczania, dostawę właściwego typu i ostrzał oraz radar. Raporty i zrzuty: `artifacts/command/upgrades/`. `progression-tests.exe`, uruchamiany przy przebudowie, sprawdza losowanie 38 kart, szczęście, 210 mieszanych dostaw, rzeczywiste bonusy wszystkich broni i moduły rdzenia.
 
 **TEST_WSPARCIA.bat** sprawdza wybór i dostawę przekaźnika, 6 połączeń, puls śnieżycy oraz podwieszony telewizor. Raporty i zrzuty: `artifacts/command/supports/`. `support-tests.exe` sprawdza limity 4+2, sąsiedztwo heksów, rzeczywiste tempo i zasięg, łączenie spowolnień, usuwanie instalacji oraz uruchomienie wsparcia dopiero po lądowaniu.
 
 **TEST_EKSPEDYCJI_02.bat** sprawdza przez klawiaturę i mysz odblokowanie fabryki, ulepszenie serii, strzał do bossa, kliknięcie kryształu, pauzę lotu drona i odbiór nagrody minimum Rare. Raporty: `artifacts/command/frontier/`. `frontier-tests.exe` dodatkowo sprawdza jednostkowe obrażenia bez obszaru, bezpieczne namierzanie, omijanie rdzenia, 2048 jeździków, losowanie kryształów i harmonogram przeciwników.
 
 **TEST_BALANSU.bat** uruchamia szybką symulację około 15 minut ekspedycji z prawdziwymi nagrodami, falami i walką. Automat celuje dokładnie i natychmiast obsługuje komputer, więc jest to kontrola tempa, a nie gwarancja poziomu trudności dla człowieka. Raport JSON i CSV: `artifacts/frontier/`.
+
+Rdzeń regeneruje **3 HP/s**. Powtarzalne **Nanoboty regenerujące** zwiększają tę wartość zależnie od rzadkości. Dwa różne komputery z ekranami skierowanymi do środka oraz animowana pompa uranu z miernikami tworzą centrum dowodzenia. [Zasady regeneracji i pompy](RDZEN_I_POMPA.md).
+
+Legendarny moduł lancy **REZERWA URANOWA** przedłuża ostrzał po 3 sekundach kosztem 5 uranu/s; wiązka i dodatkowy przewód stają się zielone. [Aktualne zmiany dział manualnych](MANUALNE_ZMIANY.md).
+
+Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry przed rzutem, a przewód rezerwy lancy jest widoczny po lewej stronie z fotela. Zatrucie dodaje 20 HP/s bestiom i 100 HP/s bossom; bossowie mają paski HP. Lampy bazy są zielone powyżej 50%, żółte przy 20–50%, czerwone przy 20% lub mniej; poniżej 20% kamera operatora lekko drży.
+
+Wszystkie dziewięć dział ma teraz własny legendarny moduł. Tesla odblokowuje PPM ze wzmacnianiem wieżyczek, katapulta klej unieruchamiający, moździerz dwa odbicia, Smart Instant namierzanie, snajper +2% obrażeń za metr i drugi ekran CRT, miotacz dwa jednoczesne strumienie. [Pełne zasady i nazwy kart](LEGENDY_MANUALNE.md).
+
+Paczka ZIP zawiera również Uruchom-Linux.sh i LINUX.txt: uruchamianie buildu Windows przez Wine albo Steam Proton. To nie jest natywny port Linux; działanie na Linux nie zostało tutaj zweryfikowane.

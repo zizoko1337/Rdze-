@@ -1,6 +1,7 @@
 #pragma once
 #include "gameplay.hpp"
 #include "turret_slots.hpp"
+#include "manual_arsenal.hpp"
 #include <deque>
 
 namespace command {
@@ -24,7 +25,6 @@ enum class Upgrade {
   TowerRange,
   FlatDamage,
   Luck,
-  Radar,
   Frost,
   Focus,
   Purge,
@@ -35,9 +35,37 @@ enum class Upgrade {
   RoverBatch,
   RoverRate,
   ServiceCredit,
+  PlasmaMortar,
+  ExtremeCooling,
+  Nanobots,
+  UraniumReserve,
+  TeslaAmplifier,
+  PlasmaGlue,
+  BouncyMortar,
+  InstantLock,
+  DoubleRangeBonus,
+  DualFlame,
   Count
 };
 enum class Rarity { Common, Uncommon, Rare, Epic, Legendary };
+inline constexpr Gun requiredManualGun(Upgrade u) {
+  switch (u) {
+  case Upgrade::TeslaAmplifier:
+    return Gun::Arc;
+  case Upgrade::PlasmaGlue:
+    return Gun::Toxin;
+  case Upgrade::BouncyMortar:
+    return Gun::Howitzer;
+  case Upgrade::InstantLock:
+    return Gun::Smart;
+  case Upgrade::DoubleRangeBonus:
+    return Gun::Rail;
+  case Upgrade::DualFlame:
+    return Gun::Flame;
+  default:
+    return Gun::Count;
+  }
+}
 struct RarityInfo {
   const char* name;
   Color color;
@@ -61,7 +89,13 @@ inline constexpr bool isTower(Upgrade u) {
   return towerWeapon(u) != TowerTypeCount;
 }
 inline constexpr Rarity minimumRarity(Upgrade u) {
+  if (requiredManualGun(u) != Gun::Count)
+    return Rarity::Legendary;
   switch (u) {
+  case Upgrade::PlasmaMortar:
+  case Upgrade::ExtremeCooling:
+  case Upgrade::UraniumReserve:
+    return Rarity::Legendary;
   case Upgrade::LanceTower:
   case Upgrade::Purge:
     return Rarity::Epic;
@@ -76,7 +110,6 @@ inline constexpr Rarity minimumRarity(Upgrade u) {
   case Upgrade::MinigunTower:
   case Upgrade::VenomTower:
   case Upgrade::FlameTower:
-  case Upgrade::Radar:
   case Upgrade::RateRelayTower:
   case Upgrade::RangeRelayTower:
   case Upgrade::RoverFactory:
@@ -86,8 +119,11 @@ inline constexpr Rarity minimumRarity(Upgrade u) {
   }
 }
 inline constexpr bool uniqueUpgrade(Upgrade u) {
-  return u == Upgrade::Radar || u == Upgrade::Frost || u == Upgrade::Focus || u == Upgrade::Purge ||
-         u == Upgrade::RoverFactory;
+  if (requiredManualGun(u) != Gun::Count)
+    return true;
+  return u == Upgrade::Frost || u == Upgrade::Focus || u == Upgrade::Purge ||
+         u == Upgrade::RoverFactory || u == Upgrade::PlasmaMortar || u == Upgrade::ExtremeCooling ||
+         u == Upgrade::UraniumReserve;
 }
 struct UpgradeInfo {
   const char* name;
@@ -138,10 +174,6 @@ inline constexpr UpgradeInfo UPGRADES[] = {
      "SZCZĘŚCIE",
      "+1% szczęścia. Większa szansa lepszych kart.",
      {.6f, 1, .5f}},
-    {"Radar taktyczny",
-     "MODUŁ RDZENIA",
-     "Odblokowuje radar z kierunkami ataku bestii.",
-     {.25f, 1, .8f}},
     {"Impulsy kriogeniczne",
      "MODUŁ RDZENIA",
      "Spowalnia bestie do 60% blisko rdzenia. Promień 85 m.",
@@ -176,7 +208,52 @@ inline constexpr UpgradeInfo UPGRADES[] = {
     {"Punkt usług",
      "JEDNORAZOWE WSPARCIE",
      "+1 punkt do wydania przy prawym komputerze na Brimstone, falę ogłuszającą lub przeciążenie.",
-     {.3f, .62f, 1}}};
+     {.3f, .62f, 1}},
+    {"Laserowy moździerz",
+     "EKSPERYMENTALNA TECHNOLOGIA PLAZMOWA",
+     "Nielegalna technologia eksperymentalna. Nie została zatwierdzona, ale raczej nikt się nie "
+     "dowie, że jej używasz. Salwa 20 impulsów lasera, rozrzut w promieniu 10 m.",
+     {.2f, .95f, 1}},
+    {"Extreme Cooling System",
+     "LEGENDARNE DZIAŁO MANUALNE",
+     "Kriogeniczne dysze chłodzą rozgrzane końcówki luf. Bazowa szybkostrzelność x5, rozrzut x2. "
+     "Zachowuje dotychczasowe premie.",
+     {.55f, .85f, 1}},
+    {"Nanoboty regenerujące",
+     "RDZEŃ / REGENERACJA",
+     "Zwiększa stałą regenerację rdzenia.",
+     {.3f, 1, .65f}},
+    {"REZERWA URANOWA",
+     "LEGENDARNA LANCA",
+     "Po 3 s lanca przechodzi na zieloną wiązkę. Zużywa 5 uranu/s do puszczenia LPM lub "
+     "wyczerpania paliwa.",
+     {.3f, 1, .2f}},
+    {"Tryb wzmacniania",
+     "LEGENDARNA TESLA",
+     "PPM: przełącz na wsparcie. Łańcuch wzmacnia do 10 wieżyczek: +100% szybkostrzelności na 10 "
+     "s.",
+     {.45f, .7f, 1}},
+    {"Dodatek kleju plazmowego",
+     "LEGENDARNA KATAPULTA",
+     "Plamy toksyny unieruchamiają zamiast spowalniać. Działają też na bossów.",
+     {.16f, .4f, .06f}},
+    {"Naboje z kauczuku antygrawitacyjnego",
+     "LEGENDARNY MOŹDZIERZ",
+     "BOUNCY BOOM: dwa dodatkowe odbicia do przodu, łącznie trzy eksplozje pełnej mocy.",
+     {1, .7f, .2f}},
+    {"Instant namierzanie",
+     "LEGENDARNE RAKIETY SMART",
+     "Usuwa półsekundowy czas namierzania. Natychmiastowa blokada celu w okienku.",
+     {1, .4f, .3f}},
+    {"Podwójna premia dystansu",
+     "LEGENDARNY SNAJPER",
+     "+2% obrażeń za metr zamiast +1%. Dodatkowy ekran CRT z dystansem i potencjalnymi "
+     "obrażeniami.",
+     {.3f, 1, .8f}},
+    {"Podwójny palnik",
+     "LEGENDARNY MIOTACZ",
+     "Druga lufa. Szeroki i skupiony strumień działają równocześnie. Zastępuje przełącznik trybów.",
+     {1, .45f, .1f}}};
 static_assert(std::size(UPGRADES) == size_t(Upgrade::Count));
 inline std::string upgradeDescription(Upgrade u, Rarity rarity) {
   float power = RARITIES[int(rarity)].power;
@@ -197,6 +274,8 @@ inline std::string upgradeDescription(Upgrade u, Rarity rarity) {
     return "+" + percent(25) + "% bazowego wydobycia uranu. Częstsze wypłaty.";
   case Upgrade::Hull:
     return "+" + percent(250) + " maksymalnego HP i tyle samo naprawy.";
+  case Upgrade::Nanobots:
+    return "+" + percent(1) + " HP/s stałej regeneracji rdzenia. Premie sumują się.";
   case Upgrade::TowerDamage:
     return "+" + percent(20) +
            "% bazowych obrażeń wszystkich wieżyczek, także przyszłych. Wzmacnia ogień i truciznę.";
@@ -231,9 +310,14 @@ struct Expedition {
   static constexpr Vec3 DOCK{32, CORE_HEIGHT - 5.5f, -10.392305f};
   bool enabled = false, shipping = false;
   float hp = 1500, maxHp = 1500, uranium = 0, miningMultiplier = 1, flightAge = 0;
+  float regeneration = 3;
   int shipments = 0, earned = 0, awaitingPickup = 0, selected = 0, luck = 0;
   bool purgeUsed = false;
   bool miningStarted = false;
+  bool manualLaser = true;
+  bool manualMinigun = false;
+  bool manualLance = false;
+  Gun manualKind = Gun::Pulse;
   int servicePoints = 0;
   std::array<bool, TowerTypeCount> towerUnlocked{};
   uint64_t rewardSerial = 0;
@@ -290,6 +374,14 @@ struct Expedition {
   }
   bool eligible(Upgrade u) const {
     if (u < Upgrade::Damage || u >= Upgrade::Count)
+      return false;
+    if (requiredManualGun(u) != Gun::Count && requiredManualGun(u) != manualKind)
+      return false;
+    if (u == Upgrade::PlasmaMortar && !manualLaser)
+      return false;
+    if (u == Upgrade::ExtremeCooling && !manualMinigun)
+      return false;
+    if (u == Upgrade::UraniumReserve && !manualLance)
       return false;
     if (isTower(u)) {
       bool support = isSupport(towerWeapon(u));
@@ -383,6 +475,7 @@ struct Expedition {
     hp = std::max(0.f, hp - std::max(0.f, damage));
     if (dead())
       return;
+    hp = std::min(maxHp, hp + regeneration * dt);
     uranium += rate() * dt;
     // Each full bar pays immediately; physical collection has its own queue.
     while (uranium >= CAPACITY) {

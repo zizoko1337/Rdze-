@@ -5,6 +5,7 @@
 #include "expedition_scene.hpp"
 #include "radar_scene.hpp"
 #include "manual_scene.hpp"
+#include "deck_instruments.hpp"
 
 namespace command {
 inline void drawConsoleNumber(GameScene& scene, Vec3 center, int value, Color color) {
@@ -35,9 +36,7 @@ inline void buildStartButton(GameScene& scene, const Session& s) {
     return t * t * (3 - 2 * t);
   };
   float age = s.expedition.miningStarted ? s.buttonAge : 0;
-  float opening = !s.expedition.miningStarted ? 0
-                  : age < 1.65f               ? ease((age - .15f) / .4f)
-                                              : 1 - ease((age - 1.65f) / .65f);
+  float opening = s.expedition.miningStarted ? ease((age - .15f) / .4f) : 0;
   scene.box(base, {2.05f, .08f, 2.05f}, {.04f, .07f, .08f});
   for (float sign : {-1.f, 1.f})
     scene.box(base + Vec3{sign * (.49f + opening * 1.05f), .07f, 0}, {.96f, .06f, 1.92f},
@@ -60,6 +59,7 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
   buildExpedition(scene, s);
   appendRadarTelevision(scene, s);
   buildStartButton(scene, s);
+  appendWarningLamps(scene, s);
   // Roof shell and circular hatch are immutable geometry in CommandRoof.
   for (float side : {-1.f, 1.f}) {
     scene.box({side * s.hatch * 4.1f, roof + .07f, 0}, {.06f, .035f, 7.2f}, mint, 0, 0, true);
@@ -87,25 +87,8 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
                std::cos(next) * Session::ROOF_RADIUS},
               .045f, dark);
   }
-  // Left: upgrades. Right: consumable services. Separate physical indicators and counters.
-  for (float side : {-1.f, 1.f}) {
-    scene.box({side * 6.8f, CORE_HEIGHT + .6f, -3.5f}, {3, 1.2f, 1.2f}, dark);
-    scene.box({side * 6.8f, CORE_HEIGHT + 1.45f, -3.45f}, {2.9f, .14f, 1.3f}, steel, 0, -.35f);
-    scene.box({side * 6.8f, CORE_HEIGHT + 1.56f, -3.65f}, {2.3f, .04f, .65f}, {.06f, .23f, .26f}, 0,
-              -.35f, true);
-    for (int k = 0; k < 8; ++k)
-      scene.box({side * 6.8f - 1 + k * .28f, CORE_HEIGHT + 1.59f, -3.66f},
-                {.11f, .025f, .12f + .25f * (1 + std::sin(k * 2.f + s.world.time))}, mint, 0, -.35f,
-                true);
-    int count = side < 0 ? int(s.expedition.rewards.size()) : s.expedition.servicePoints;
-    Color indicator = side < 0 ? Color{.15f, 1, .3f} : Color{.3f, .6f, 1};
-    bool lit = count > 0 && (side > 0 || std::fmod(s.deckClock, .8f) < .4f);
-    scene.box({side * 6.8f + .45f, CORE_HEIGHT + 1.48f, -3.98f}, {.87f, .48f, .09f}, dark);
-    drawConsoleNumber(scene, {side * 6.8f + .45f, CORE_HEIGHT + 1.48f, -4.04f}, count, indicator);
-    scene.box({side * 6.8f - .8f, CORE_HEIGHT + 1.47f, -4.0f}, {.25f, .25f, .08f}, dark);
-    scene.box({side * 6.8f - .8f, CORE_HEIGHT + 1.47f, -4.05f}, {.16f, .16f, .03f},
-              lit ? indicator : Color{.025f, .08f, .04f}, 0, 0, lit);
-  }
+  appendCommandConsoles(scene, s);
+  appendUraniumPump(scene, s);
   scene.tube({0, CORE_HEIGHT + .18f, 0}, {2.85f, .25f, 2.85f}, dark);
   for (int i = 0; i < 12; ++i) {
     float a = i * PI / 6;
@@ -136,7 +119,7 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
     seatBox({side * .45f, .3f, -.25f}, {.38f, .12f, .65f}, steel);
     seatBox({side * .62f, .65f, .35f}, {.16f, 1.2f, .65f}, steel);
   }
-  const Color accent = s.module.spec().color;
+  const Color accent = s.lanceReserveActive ? Color{.25f, 1, .18f} : s.module.spec().color;
   auto gunBox = [&](Vec3 p, Vec3 size, Color c, bool glow = false) {
     p.z -= s.recoil * .16f;
     scene.box(s.gunPoint(p), size, c, s.gunYaw, -s.gunPitch, glow);
@@ -152,7 +135,7 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
     barrel({side * .5f, -.1f, -.55f}, {side * .5f, .3f, -.55f}, .07f, dark);
     gunBox({side * .57f, .1f, .25f}, {.04f, .13f, .8f}, accent, true);
   }
-  if (s.module.kind == Gun::Pulse) {
+  if (s.module.kind == Gun::Pulse && !s.module.plasma) {
     barrel({0, 0, 1}, {0, 0, 3.1f}, .19f, dark);
     barrel({0, 0, 3.08f}, {0, 0, 3.2f}, .24f, accent, true);
     for (int i = 0; i < 5; ++i) {
@@ -163,24 +146,50 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
     float ready = 1 - std::clamp(s.cooldown, 0.f, 1.f);
     gunBox({0, .34f, .15f}, {.7f * std::max(.05f, ready), .03f, .22f}, accent, true);
   } else if (s.module.kind == Gun::Crank) {
+    float heat = std::clamp((s.barrelHeat - .12f) / .5f, 0.f, 1.f);
+    Color hot{steel.r * (1 - heat) + heat, steel.g * (1 - heat) + .1f * heat,
+              steel.b * (1 - heat) + .025f * heat};
     for (int i = 0; i < 6; ++i) {
       float a = s.spin + i * PI / 3, x = std::sin(a) * .26f, y = std::cos(a) * .26f;
-      barrel({x, y, .95f}, {x, y, 3.2f}, .085f, steel);
-      barrel({x, y, 3.2f}, {x, y, 3.23f}, .09f, s.shotFlash > 0 ? accent : dark, s.shotFlash > 0);
+      barrel({x, y, .95f}, {x, y, 2.55f}, .085f, steel);
+      barrel({x, y, 2.55f}, {x, y, 3.2f}, .085f, hot, heat > .25f);
+      barrel({x, y, 3.2f}, {x, y, 3.23f}, .09f, heat > .15f ? hot : dark, heat > .25f);
     }
     barrel({0, 0, 1.2f}, {0, 0, 1.35f}, .4f, dark);
     barrel({0, 0, 2.75f}, {0, 0, 2.85f}, .39f, dark);
     gunBox({-.9f, -.15f, .3f}, {.65f, .8f, 1.1f}, dark);
     // The hand crank is a real off-axis rotating lever, separate from the barrel drum.
-    Vec3 axle{.8f, -.05f, 1.05f},
-        end{.95f, -.05f + std::cos(s.spin) * .4f, 1.05f + std::sin(s.spin) * .4f};
-    barrel({.55f, -.05f, 1.05f}, axle, .09f, steel);
+    Vec3 axle = s.module.extremeCooling ? Vec3{.55f, .59f, .6f} : Vec3{.8f, -.05f, 1.05f};
+    Vec3 end = s.module.extremeCooling
+                   ? axle + Vec3{std::cos(s.spin) * .18f, .08f, std::sin(s.spin) * .18f}
+                   : Vec3{.95f, -.05f + std::cos(s.spin) * .4f, 1.05f + std::sin(s.spin) * .4f};
+    barrel(s.module.extremeCooling ? Vec3{.55f, .32f, .6f} : Vec3{.55f, -.05f, 1.05f}, axle, .07f,
+           steel);
     barrel(axle, end, .065f, accent);
-    barrel(end, end + Vec3{.3f, 0, 0}, .1f, dark);
+    barrel(end, end + (s.module.extremeCooling ? Vec3{0, .15f, 0} : Vec3{.3f, 0, 0}), .075f, dark);
+    if (s.module.extremeCooling) {
+      Color frost{.4f, .8f, 1};
+      for (float side : {-1.f, 1.f}) {
+        gunBox({side * 1.06f, -.2f, .65f}, {.4f, .75f, 1.25f}, dark);
+        gunBox({side * 1.08f, .21f, .65f}, {.25f, .06f, .9f}, frost, true);
+        barrel({side * 1.06f, 0, 1.25f}, {side * .62f, .18f, 2.72f}, .055f, steel);
+        barrel({side * .62f, .18f, 2.72f}, {side * .62f, .18f, 3.03f}, .065f, frost, true);
+        barrel({side * .62f, .18f, 3.03f}, {side * .44f, .1f, 3.13f}, .065f, steel);
+        for (int i = 0; i < 4; ++i)
+          gunBox({side * 1.29f, -.2f + i * .15f, .65f}, {.045f, .04f, .9f}, steel);
+      }
+    }
   } else
     buildExtraManualGun(scene, s);
-  if (s.shotFlash > 0)
-    scene.hot.push_back(instance(s.muzzle(), {.7f, .7f, 1}, accent, 0, 0, s.shotFlash * 7));
+  if (s.shotFlash > 0) {
+    if (s.module.kind == Gun::Pulse && s.module.plasma) {
+      for (int i = 0; i < 20; ++i)
+        if (PlasmaSpec::visibleEmitter(i))
+          scene.hot.push_back(
+              instance(s.plasmaMuzzle(i), {.25f, .25f, 1}, accent, 0, 0, s.shotFlash * 7));
+    } else
+      scene.hot.push_back(instance(s.muzzle(), {.7f, .7f, 1}, accent, 0, 0, s.shotFlash * 7));
+  }
   for (const auto& b : s.bullets)
     scene.beams.push_back(lineInstance(b.pos - normalize(b.velocity) * 1.8f, b.pos, accent, .055f));
   appendManualEffects(scene, s);
@@ -190,19 +199,24 @@ class CommandUi : public GameUi {
   std::vector<Instance> radarMarks;
 
 public:
+  float radarHeading = 0;
+  static constexpr float COLLECTOR_Y = 440;
   bool tacticalCovered(float px, float py) const {
     float x = px / scale, y = py / scale;
     return y < 80 || y > height - 180 || Rect{26, 94, 310, 360}.contains(x, y) ||
-           Rect{width - 354, 94, 328, 570}.contains(x, y) || Rect{26, 454, 310, 102}.contains(x, y);
+           Rect{width - 354, 94, 328, 113}.contains(x, y) ||
+           Rect{width - 238, 220, 212, 204}.contains(x, y) ||
+           Rect{width - 354, COLLECTOR_Y, 328, 145}.contains(x, y) ||
+           Rect{26, 454, 310, 102}.contains(x, y);
   }
-  Rect collectorButton(bool radar) const {
-    return {width - 336, (radar ? 510.f : 220.f) + 101, 292, 29};
-  }
+  Rect collectorButton() const { return {width - 336, COLLECTOR_Y + 101, 292, 29}; }
   Rect rewardCard(int i) const {
     float w = std::min(370.f, (width - 120) / 3 - 20);
     return {width / 2 - (3 * w + 40) / 2 + i * (w + 20), height / 2 - 65, w, 285};
   }
   Rect restartButton() const { return {width / 2 - 190, height / 2 + 135, 380, 56}; }
+  Rect pauseResumeButton() const { return {width / 2 - 200, height / 2 - 75, 400, 56}; }
+  Rect pauseMenuButton() const { return {width / 2 - 200, height / 2, 400, 56}; }
   int rewardClick(float px, float py) const {
     for (int i = 0; i < 3; ++i)
       if (rewardCard(i).contains(px / scale, py / scale))
@@ -210,20 +224,19 @@ public:
     return -1;
   }
   void drawRadar(Renderer& r, const Session& s) {
-    if (s.expedition.levels[size_t(Upgrade::Radar)] == 0)
-      return;
-    float x = width - 354, y = 220, cx = x + 164, cy = y + 150;
-    panel(r, {x, y, 328, 273});
-    text(r, x + 18, y + 14, "RADAR / ZASIĘG 350 M", 14, mint);
-    text(r, x + 18, y + 250, "Zielone: obrona / czerwone: bestie", 11, muted);
+    float x = width - 238, y = 220, cx = x + 106, cy = y + 110;
+    panel(r, {x, y, 212, 204});
+    text(r, x + 12, y + 12, "RADAR / 350 M", 11, mint);
+    text(r, x + 12, y + 185, "GÓRA = KIERUNEK PATRZENIA", 8, muted);
     for (int line = -2; line <= 2; ++line) {
-      rect(r, {cx - 100, cy + line * 50, 200, 1}, {.12f, .24f, .27f});
-      rect(r, {cx + line * 50, cy - 100, 1, 200}, {.12f, .24f, .27f});
+      rect(r, {cx - 64, cy + line * 32, 128, 1}, {.12f, .24f, .27f});
+      rect(r, {cx + line * 32, cy - 64, 1, 128}, {.12f, .24f, .27f});
     }
     radarMarks.clear();
     auto blip = [&](float px, float pz, float size, Color color) {
       float distance = std::max(350.f, std::hypot(px, pz));
-      float bx = cx + px / distance * 100, by = cy - pz / distance * 100;
+      auto local = radarLocal(px, pz, radarHeading);
+      float bx = cx + local.x / distance * 64, by = cy - local.z / distance * 64;
       radarMarks.push_back({bx * scale, by * scale, 0, size * scale, size * scale, 1, 0, color.r,
                             color.g, color.b, 1, 0});
     };
@@ -236,7 +249,7 @@ public:
              foe.type >= Titan ? Color{1, .65f, .2f} : Color{1, .25f, .3f});
     }
     for (int i = 1; i <= 10; ++i)
-      blip(std::sin(s.gunYaw) * i * 10, std::cos(s.gunYaw) * i * 10, 2, {.4f, .9f, 1});
+      blip(std::sin(radarHeading) * i * 10, std::cos(radarHeading) * i * 10, 2, {.4f, .9f, 1});
     for (const auto& rover : s.frontier.rovers)
       blip(rover.position.x, rover.position.z, 2, {.3f, 1, .9f});
     for (const auto& c : s.frontier.crystals)
@@ -287,13 +300,15 @@ public:
              tier.color);
         text(r, card.x + 22, card.y + 48, info.category, 11, info.color);
         text(r, card.x + 22, card.y + 80, info.name, std::strlen(info.name) > 24 ? 18 : 22);
-        paragraph(r, card.x + 22, card.y + 122, upgradeDescription(kind, rarity), 37, 14, muted);
+        paragraph(r, card.x + 22, card.y + 122, upgradeDescription(kind, rarity),
+                  kind == Upgrade::PlasmaMortar ? 43 : 37, kind == Upgrade::PlasmaMortar ? 12 : 14,
+                  muted);
         text(r, card.x + 22, card.y + 252, "ZAINSTALUJ / " + std::to_string(i + 1), 14, tier.color);
       }
     }
     text(r, 65, height - 128,
          "Manual: " + number(s.module.spec().damage * s.module.damageMultiplier + s.flatDamage, 1) +
-             " DMG / " + number(s.module.rateMultiplier / s.module.spec().interval, 1) +
+             " DMG / " + number(s.module.rateMultiplier / s.module.interval(), 1) +
              " strz./s   |   Szczęście: +" + std::to_string(e.luck) + "%",
          14, mint);
     text(r, 65, height - 101,
@@ -345,7 +360,7 @@ public:
   void drawCommand(Renderer& r, const Session& s, float fps, bool captured, bool help, bool sound,
                    int hoveredSlot = -1, uint64_t hoveredCrystal = 0) {
     resize(r.width, r.height);
-    const auto accent = s.module.spec().color;
+    const auto accent = s.lanceReserveActive ? Color{.25f, 1, .18f} : s.module.spec().color;
     if (s.mode == Mode::Selection) {
       rect(r, {0, 0, 1130, height}, {.012f, .035f, .045f}, .95f);
       text(r, 70, 72, "RDZEŃ", 46, mint);
@@ -422,14 +437,16 @@ public:
            11, muted);
     }
     panel(r, {26, 94, 310, s.expedition.enabled ? 214.f : 76.f});
-    text(r, 42, 108, s.module.spec().name, 19, accent);
+    text(r, 42, 108, s.module.name(), 19, accent);
     if (s.expedition.enabled) {
       const auto& e = s.expedition;
-      text(r, 42, 147, "RDZEŃ  " + number(e.hp) + " / " + number(e.maxHp) + " HP", 16,
-           e.hp < e.maxHp * .35f ? Color{1, .3f, .25f} : mint);
+      Color integrity = s.coreWarningLevel() == 0   ? mint
+                        : s.coreWarningLevel() == 1 ? Color{1, .75f, .1f}
+                                                    : Color{1, .2f, .15f};
+      text(r, 42, 147, "RDZEŃ  " + number(e.hp) + " / " + number(e.maxHp) + " HP", 16, integrity);
       rect(r, {42, 177, 275, 7}, {.15f, .23f, .25f});
-      rect(r, {42, 177, 275 * e.hp / e.maxHp, 7},
-           e.hp < e.maxHp * .35f ? Color{1, .3f, .25f} : mint);
+      rect(r, {42, 177, 275 * e.hp / e.maxHp, 7}, integrity);
+      text(r, 42, 186, "REGENERACJA  +" + number(e.regeneration, 1) + " HP/s", 9, mint);
       text(r, 42, 200, "URAN  " + number(e.uranium, 1) + " / 100", 16);
       rect(r, {42, 230, 275, 5}, {.15f, .23f, .25f});
       rect(r, {42, 230, 275 * std::min(1.f, e.uranium / 100), 5}, {.45f, .9f, .3f});
@@ -447,8 +464,7 @@ public:
                             : "Transport po zebraniu 100 uranu",
            12, muted);
       drawRadar(r, s);
-      bool radar = e.levels[size_t(Upgrade::Radar)] > 0;
-      float y = radar ? 510 : 220;
+      float y = COLLECTOR_Y;
       panel(r, {width - 354, y, 328, 145});
       text(r, width - 336, y + 14, "KRYSZTAŁY / DRON ZBIERAJĄCY", 12, mint);
       const char* droneStatus =
@@ -461,7 +477,7 @@ public:
            "W terenie: " + std::to_string(s.frontier.crystals.size()) +
                "   Zebrane: " + std::to_string(s.frontier.collected),
            12, muted);
-      panel(r, collectorButton(radar));
+      panel(r, collectorButton());
       text(r, width - 324, y + 106, "[C] WYŚLIJ PO NAJBLIŻSZY", 13,
            s.frontier.nearestCrystal() ? mint : muted);
       if (e.levels[size_t(Upgrade::RoverFactory)] > 0) {
@@ -525,6 +541,10 @@ public:
         panel(r, {width / 2 - 250, height * .64f, 500, 70});
         text(r, width / 2 - 226, height * .64f + 12, "[E] URUCHOM WYDOBYCIE", 25, {1, .3f, .15f});
         text(r, width / 2 - 226, height * .64f + 48, "Naciśnij czerwony przycisk", 13, muted);
+      } else if (s.nearRadio()) {
+        panel(r, {width / 2 - 245, height * .64f, 490, 70});
+        text(r, width / 2 - 220, height * .64f + 10, "[E] URANIUM FM / RADIO", 25, mint);
+        text(r, width / 2 - 220, height * .64f + 48, "Stacja, utwory i glosnosc", 13, muted);
       } else if (s.nearServices()) {
         panel(r, {width / 2 - 245, height * .64f, 490, 70});
         text(r, width / 2 - 220, height * .64f + 10, "[E] JEDNORAZOWE USŁUGI", 25, {.3f, .65f, 1});
@@ -557,22 +577,32 @@ public:
       std::string status =
           s.mode == Mode::Raising    ? "OTWIERANIE WŁAZU / PODNOSZENIE"
           : s.mode == Mode::Lowering ? "POWRÓT NA POKŁAD"
+          : s.lanceReserveActive     ? "REZERWA URANOWA / 5 U/s"
           : s.lanceRemaining > 0     ? "CIĄGŁA WIĄZKA / " + number(s.lanceRemaining, 1) + " s"
           : s.lanceCharge > 0        ? "ŁADOWANIE KONDENSATORÓW"
           : s.cooldown > .05f        ? "ŁADOWANIE  " + number(s.cooldown, 1) + " s"
+          : s.module.kind == Gun::Smart &&
+                  s.world.valid(s.smartCandidate, s.smartCandidateGeneration) &&
+                  !s.world.valid(s.smartTarget, s.smartGeneration)
+              ? "NAMIERZANIE " + number(s.smartLock, 2) + " / 0,50 s"
           : s.module.kind == Gun::Smart && !s.world.valid(s.smartTarget, s.smartGeneration)
               ? "BRAK CELU W OKIENKU"
               : "GOTOWOŚĆ / LPM — OGIEŃ";
       text(r, x - 170, height - 143, status, 15, accent);
       float progress = s.mode == Mode::Mounted
-                           ? 1 - std::clamp(s.cooldown / s.module.spec().interval, 0.f, 1.f)
+                           ? 1 - std::clamp(s.cooldown / s.module.interval(), 0.f, 1.f)
                            : s.lift;
       if (s.mode == Mode::Mounted && s.module.kind == Gun::Lance) {
-        if (s.lanceRemaining > 0)
+        if (s.lanceReserveActive)
+          progress = 1;
+        else if (s.lanceRemaining > 0)
           progress = s.lanceRemaining / 3;
         else if (s.cooldown <= 0)
           progress = s.lanceCharge / 1.8f;
       }
+      if (s.mode == Mode::Mounted && s.module.kind == Gun::Smart && s.smartCandidate >= 0 &&
+          s.smartTarget < 0)
+        progress = s.smartLock / .5f;
       rect(r, {x - 170, height - 111, 340, 3}, {.13f, .24f, .27f});
       rect(r, {x - 170, height - 111, 340 * progress, 3}, accent);
       text(r, x - 170, height - 95, "E — opuść stanowisko   |   Mysz — celuj", 11, muted);
@@ -585,8 +615,15 @@ public:
                       "  F1 pomoc",
          13, muted);
     if (s.world.paused) {
-      panel(r, {width / 2 - 180, 112, 360, 48});
-      text(r, width / 2 - 155, 123, "PAUZA / P — wznów", 23, mint);
+      rect(r, {0, 0, width, height}, {.005f, .015f, .025f}, .72f);
+      panel(r, {width / 2 - 235, height / 2 - 155, 470, 300});
+      text(r, width / 2 - 200, height / 2 - 125, "PAUZA", 28, mint);
+      panel(r, pauseResumeButton());
+      text(r, pauseResumeButton().x + 24, pauseResumeButton().y + 18, "WZNÓW GRĘ [P]", 19, mint);
+      panel(r, pauseMenuButton());
+      text(r, pauseMenuButton().x + 24, pauseMenuButton().y + 18, "WRÓĆ DO MENU GŁÓWNEGO", 18,
+           white);
+      text(r, width / 2 - 200, height / 2 + 87, "Powrót kończy obecną ekspedycję.", 12, muted);
     } else if (s.serviceTarget != Service::None) {
       panel(r, {width / 2 - 265, 132, 530, 46});
       text(r, width / 2 - 245, 144, "WSKAŻ CEL USŁUGI / CZAS ZATRZYMANY", 17, {.3f, .65f, 1});
@@ -606,7 +643,8 @@ public:
            "WASD / Shift   Chodzenie / bieg po platformie\nMysz           Rozglądanie / "
            "celowanie\nE              Działo / komputer / powrót windą\nTAB            Heksy / "
            "powrót na pokład\nLPM            Strzelaj / zamów zrzut "
-           "(możesz przytrzymać)\nP              Pauza / wznowienie\nR              Powrót do "
+           "(możesz przytrzymać)\n;              Laboratorium ulepszeń\n'              Bestiariusz "
+           "/ przywoływanie\nP              Pauza / wznowienie\nR              Powrót do "
            "wyboru broni i nowa próba\nM / V          Dźwięk / VSync\nF11            Pełny "
            "ekran\nEsc            Uwolnij mysz / pauza\nAlt+F4         Wyjście\nF1             "
            "Zamknij pomoc",

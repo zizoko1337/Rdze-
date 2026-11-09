@@ -14,6 +14,9 @@ void mount(Session& s, Gun gun) {
   s.mode = Mode::Mounted;
   s.lift = s.hatch = 1;
   s.module.kind = gun;
+  // These scenarios isolate flight and steering; acquisition delay has its own tests.
+  if (gun == Gun::Smart)
+    s.module.instantLock = true;
   s.spawnTimer = 100000;
 }
 int enemy(Session& s, float x, float z, float hp = 10000) {
@@ -43,7 +46,7 @@ int main() {
       s.fire();
       for (int i = 0; i < 12; ++i)
         require(s.world.foes[ids[i]].hp == (i < 10 ? 9660 : 10000),
-                "Tesla chain damage, 28m jumps or 10-target limit wrong");
+                "Tesla chain damage, 56m jumps or 10-target limit wrong");
       tick(s, 1, true);
       require(s.shots == 1, "Tesla ignores long cooldown");
       std::cout << "PASS aimed Tesla, chained jumps beyond blast radius, 10 unique targets and "
@@ -80,9 +83,13 @@ int main() {
       require(s.toxicPatches.empty() && s.world.foes[id].hp == 10000,
               "Toxin cloud exists before grenade arrives");
       tick(s, 11);
-      require(s.manualProjectiles.empty() && s.toxicPatches.empty() &&
-                  std::abs(s.world.foes[id].hp - 9480) < 1,
-              "Toxin patch does not expire after eight seconds / 520 damage");
+      require(s.manualProjectiles.empty() && s.toxicPatches.empty(),
+              "Toxin patch does not expire after eight seconds");
+      tick(s, 8);
+      // First poison application occurs on the patch's first 0.1s damage tick.
+      require(std::abs(s.world.damageDone[Venom] - 798) < .1f &&
+                  std::abs(s.world.foes[id].hp - 9202) < 1,
+              "Toxin patch plus residual poison has incorrect accumulated damage");
       Session slow;
       mount(slow, Gun::Toxin);
       int foe = enemy(slow, 0, 70);
@@ -187,7 +194,7 @@ int main() {
       require(s.lanceCharge == charge, "Lance charge ignores pause");
       s.world.paused = false;
       tick(s, 3.3f, true);
-      require(s.shots == 1 && std::abs(s.world.foes[id].hp - 8080) < 2 && s.cooldown > 0,
+      require(s.shots == 1 && std::abs(s.world.foes[id].hp - 7880) < 2 && s.cooldown > 0,
               "Lance full three-second beam damage / cooling wrong");
       Session cancel;
       mount(cancel, Gun::Lance);

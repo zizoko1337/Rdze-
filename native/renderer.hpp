@@ -99,22 +99,26 @@ float3 beamSide(float3 dir,float3 toEye){
  return safeDirection(side,float3(1,0,0));
 }
 VSOut vsMain(VSIn i){VSOut o;float mode=params.x;float3 p=i.p*i.scale;
- if(mode==1||mode==8||mode==9){p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
+ if(mode==1||mode==8||mode==9||mode==17){p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
  else if(mode==2){float3 dir=safeDirection(float3(i.yaw,0,i.extra),float3(0,0,1));float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+side*p.x+dir*p.y;o.normal=float3(0,1,0);}
  else if(mode==7){float3 dir=float3(i.scale.y,i.scale.z,i.yaw);float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+dir*i.p.y+side*i.p.x*i.scale.x;o.normal=float3(0,1,0);}
  else if(mode==10||mode==12){p=i.origin+float3(i.p.x*i.scale.x,0,i.p.y*i.scale.y);o.normal=float3(0,1,0);}
  else if(mode==14){p=float3(i.origin.x+i.p.x*i.scale.x,.12,i.origin.z+i.p.y*i.scale.y);o.normal=float3(sin(i.yaw)*cos(i.extra),sin(i.extra),cos(i.yaw)*cos(i.extra));}
- else {float pitch=(mode==0||mode==6||mode==13)?i.extra:0;float sp=sin(pitch),cp=cos(pitch);p=float3(p.x,p.y*cp-p.z*sp,p.y*sp+p.z*cp);float s=sin(i.yaw),c=cos(i.yaw);p=i.origin+float3(p.x*c+p.z*s,p.y,-p.x*s+p.z*c);float3 n=i.n/max(i.scale,.0001);n=float3(n.x,n.y*cp-n.z*sp,n.y*sp+n.z*cp);o.normal=normalize(float3(n.x*c+n.z*s,n.y,-n.x*s+n.z*c));}
+ else {float pitch=mode==18?i.color.a:((mode==0||mode==6||mode==13)?i.extra:0);float sp=sin(pitch),cp=cos(pitch);p=float3(p.x,p.y*cp-p.z*sp,p.y*sp+p.z*cp);float s=sin(i.yaw),c=cos(i.yaw);p=i.origin+float3(p.x*c+p.z*s,p.y,-p.x*s+p.z*c);float3 n=i.n/max(i.scale,.0001);n=float3(n.x,n.y*cp-n.z*sp,n.y*sp+n.z*cp);o.normal=normalize(float3(n.x*c+n.z*s,n.y,-n.x*s+n.z*c));}
  o.world=p;o.uv=i.uv;o.color=i.color;
- if(mode==14)o.world=float3(i.p.x*i.scale.x,1.8-i.origin.y,i.p.y*i.scale.y);
+ if(mode==15||mode==18){if(mode==18)o.color.a=1;float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+i.uv)/float2(16,8);}
+ if(mode==14){o.world=float3(i.p.x*i.scale.x,1.8-i.origin.y,i.p.y*i.scale.y);o.uv=float2(i.scale.x*.5,i.scale.z);}
  if(mode==11){o.p=float4(i.p.xy*2,1,1);o.world=normalize(cross(camRight.xyz,camUp.xyz)+camRight.xyz*i.p.x*2*params.z/params.w*eye.w+camUp.xyz*i.p.y*2*eye.w);}
- else if(mode==4||mode==5){o.p=float4(p.x/params.z*2-1,1-p.y/params.w*2,0,1);if(mode==4){float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+float2(i.uv.x,1-i.uv.y))/float2(16,8);}}
+ else if(mode==4||mode==5||mode==16){o.p=float4(p.x/params.z*2-1,1-p.y/params.w*2,0,1);if(mode==16)o.uv=float2(i.uv.x,1-i.uv.y);if(mode==4){float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+float2(i.uv.x,1-i.uv.y))/float2(16,8);}}
  else o.p=mul(float4(p,1),vp);
  return o;
 }
 float4 psMain(VSOut i):SV_TARGET{
  float mode=params.x;float4 c=i.color;
+ if(mode==17){float border=(i.uv.x<.008||i.uv.x>.992||i.uv.y<.12||i.uv.y>.88)?1:0;float3 fill=i.uv.x<=c.a?c.rgb:float3(.035,.045,.055);return float4(lerp(fill,float3(.65,.7,.72),border),1);}
+ if(mode==16)return c*tex.Sample(samp,i.uv);
  if(mode==4){c.a*=tex.Sample(samp,i.uv).a;return c;}
+ if(mode==15||mode==18){c.a*=tex.Sample(samp,i.uv).a;return c;}
  if(mode==5)return c;
  if(mode==13){
   float tick=floor(params.y*20);float2 p=i.uv*2-1;
@@ -132,7 +136,7 @@ float4 psMain(VSOut i):SV_TARGET{
   image=image*float3(.96,1,.98)*scan*roll*vignette+noise*.025;
   return float4(max(image,0)*mask,1);
  }
- if(mode==14){float d=length(i.world.xz),cone=dot(normalize(i.world),normalize(i.normal));clip(63-d);clip(cone-.87758256);float rim=1-smoothstep(0,1,63-d);float edge=1-smoothstep(0,.012,cone-.87758256);float band=frac(d/21)*21;float ticks=1-smoothstep(.12,.4,min(band,21-band));return float4(c.rgb,c.a*(.12+.42*max(rim,edge)+.16*ticks));}
+ if(mode==14){float d=length(i.world.xz),cone=dot(normalize(i.world),normalize(i.normal));clip(i.uv.x-d);clip(cone-i.uv.y);float rim=1-smoothstep(0,1,i.uv.x-d);float edge=1-smoothstep(0,min(.012,(1-i.uv.y)*.3),cone-i.uv.y);float band=frac(d/21)*21;float ticks=1-smoothstep(.12,.4,min(band,21-band));return float4(c.rgb,c.a*(.12+.42*max(rim,edge)+.16*ticks));}
  if(mode==11){float3 ray=normalize(i.world);float h=saturate(ray.y);float3 sky=lerp(float3(.19,.28,.31),float3(.008,.02,.04),pow(h,.45));float moon=dot(ray,normalize(float3(-.55,.34,.8)));float disc=smoothstep(.9966,.9968,moon);sky=lerp(sky,float3(.25,.42,.45)*( .7+.25*sin(ray.y*650)),disc);float2 stars=floor(ray.xz/max(ray.y,.05)*380);float star=step(.9991,frac(sin(dot(stars,float2(12.9898,78.233)))*43758.5453))*smoothstep(.1,.6,ray.y);sky+=star*.25;return float4(sky,1);}
  if(mode==6)return float4(pow(max(c.rgb,0),1/2.2),c.a);
  if(mode==7){float edge=saturate(1-abs(i.uv.x*2-1));return float4(c.rgb*(.8+edge),c.a*edge);}
@@ -587,12 +591,13 @@ public:
     context->IASetVertexBuffers(0, 2, bufs, strides, offsets);
     context->PSSetShaderResources(0, 1, &textureView);
     instanceOffset += UINT(count);
-    bool overlay = mode == 4 || mode == 5 || mode == 11,
+    bool overlay = mode == 4 || mode == 5 || mode == 11 || mode == 16,
          soft = mode == 2 || mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
-                mode == 14;
+                mode == 14 || mode == 15 || mode == 18;
     context->OMSetDepthStencilState(overlay ? depthOff : soft ? depthRead : depthWrite, 0);
     bool add = mode == 2 || mode == 7 || mode == 8;
-    bool blend = mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14;
+    bool blend =
+        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18;
     context->OMSetBlendState(add ? additive : blend ? alpha : opaque, nullptr, 0xffffffff);
     context->DrawInstanced(mesh.count, UINT(count), 0, 0);
     ++drawCalls;

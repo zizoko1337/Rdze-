@@ -37,7 +37,21 @@ inline bool supportNeighbor(float ax, float az, float bx, float bz) {
       return true;
   return false;
 }
-enum Species { Crawler, Runner, Brute, Spitter, Floater, Titan, Queen, SpeciesCount };
+enum Species {
+  Crawler,
+  Runner,
+  Brute,
+  Spitter,
+  Floater,
+  Saboteur,
+  SiegeSpitter,
+  Titan,
+  Queen,
+  Brain,
+  SpeciesCount
+};
+constexpr float SABOTAGE_TIME = 3, BRAIN_RADIUS = SUPPORT_SPACING * 2;
+constexpr float BRAIN_INTERVAL = 6, BRAIN_DISABLE = 4, SIEGE_RANGE = SUPPORT_SPACING * 3;
 struct Color {
   float r, g, b;
 };
@@ -151,17 +165,24 @@ struct SpeciesInfo {
   const char* texture;
   float hp, speed, size, altitude;
 };
-inline constexpr SpeciesInfo SPECIES[] = {{"Pełzacz", "alien-beast.png", 100, 9, 3.8f, 0},
-                                          {"Łowca", "alien-runner.png", 75, 17, 4.5f, 0},
-                                          {"Taran", "alien-brute.png", 650, 6, 7, 0},
-                                          {"Plujec", "alien-spitter.png", 230, 7.5f, 5.2f, 0},
-                                          {"Widmo", "alien-floater.png", 155, 13, 5.5f, 5},
-                                          {"TYTAN BAZALTU", "boss-titan.png", 18000, 3.4f, 25, 0},
-                                          {"KRÓLOWA ROJU", "boss-queen.png", 13500, 4.4f, 22, 2}};
+inline constexpr SpeciesInfo SPECIES[] = {
+    {"Pełzacz", "alien-beast.png", 100, 9, 3.8f, 0},
+    {"Łowca", "alien-runner.png", 75, 17, 4.5f, 0},
+    {"Taran", "alien-brute.png", 650, 6, 7, 0},
+    {"Plujec", "alien-spitter.png", 230, 7.5f, 5.2f, 0},
+    {"Widmo", "alien-floater.png", 155, 13, 5.5f, 5},
+    {"Sabotażysta", "alien-saboteur.png", 1600, 5, 7.5f, 0},
+    {"Plujec oblężniczy", "alien-siege-spitter.png", 900, 3, 8, 0},
+    {"TYTAN BAZALTU", "boss-titan.png", 18000, 3.4f, 25, 0},
+    {"KRÓLOWA ROJU", "boss-queen.png", 13500, 4.4f, 22, 2},
+    {"NADUMYSŁ", "boss-brain.png", 16000, 2.6f, 20, 3}};
+static_assert(std::size(SPECIES) == SpeciesCount);
 struct Foe {
   float x = 0, z = 0, hp = 0, maxHp = 0, speed = 0, size = 0, altitude = 0, phase = 0;
   float poison = 0, poisonDps = 0, burn = 0, burnDps = 12, flash = 0, ability = 0, stun = 0;
-  float toxicSlow = 0;
+  float toxicSlow = 0, glued = 0;
+  float sabotage = 0, towerSearch = 0;
+  uint32_t towerTarget = 0;
   Species type = Crawler;
   uint32_t generation = 0;
   bool elite = false;
@@ -179,6 +200,8 @@ struct Tower {
   uint32_t generation = 0, id = 0;
   uint64_t shots = 0;
   float localRate = 1, localRange = 1;
+  float disabledUntil = 0;
+  float amplifiedUntil = 0;
 };
 struct SupportLink {
   uint16_t source, target;
@@ -209,6 +232,13 @@ struct RingFx {
   Vec3 pos;
   Color color;
   float radius, life, maxLife;
+};
+struct EnemyShot {
+  Vec3 start;
+  float age, duration, damage;
+  Vec3 position(float t) const {
+    return start * (1 - t) + Vec3{0, CORE_HEIGHT * .5f, 0} * t + Vec3{0, std::sin(t * PI) * 12, 0};
+  }
 };
 
 class SpatialGrid {
@@ -288,6 +318,9 @@ public:
   uint32_t focusGeneration = 0;
   float focusTime = 0, focusDamageBonus = 0;
   uint32_t nextTower = 1;
+  uint64_t brimstonePulses = 0, overloadBlasts = 0;
+  std::vector<EnemyShot> enemyShots;
+  std::vector<Weapon> destroyedTowers;
   std::array<uint64_t, WeaponCount> fired{}, hits{};
   std::array<double, WeaponCount> damageDone{};
   std::string announcement = "Arsenał gotowy. Budowanie bez kosztów.";
@@ -301,6 +334,8 @@ public:
     particles.reserve(18000);
     gas.reserve(512);
     rings.reserve(1024);
+    enemyShots.reserve(512);
+    destroyedTowers.reserve(MAX_TOWERS);
     fxRandom.state = 9187;
     for (int i = MAX_FOES - 1; i >= 0; --i)
       freeIds.push_back(i);
@@ -340,6 +375,8 @@ public:
   WeaponInfo weaponInfo(const Tower& tower) const {
     auto info = weaponInfo(tower.type);
     info.cooldown /= tower.localRate;
+    if (tower.amplifiedUntil > time)
+      info.cooldown *= .5f;
     info.range *= tower.localRange;
     return info;
   }
@@ -348,7 +385,7 @@ public:
     preview.type = type;
     if (!isSupport(type))
       for (const auto& source : towers)
-        if (supportNeighbor(source.x, source.z, x, z)) {
+        if (source.disabledUntil <= time && supportNeighbor(source.x, source.z, x, z)) {
           if (source.type == RateRelay)
             preview.localRate = 1.2f;
           if (source.type == RangeRelay)
@@ -365,6 +402,8 @@ public:
       tower.localRate = tower.localRange = 1;
     for (size_t i = 0; i < towers.size(); ++i) {
       const auto& source = towers[i];
+      if (source.disabledUntil > time)
+        continue;
       if (source.type == FrostTower) {
         hasFrostSupports = true;
         int x0 = std::clamp(int(std::floor((source.x - 40 + 512) / 16)), 0, 63);
@@ -396,6 +435,8 @@ public:
     if (cx >= 0 && cx < 64 && cz >= 0 && cz < 64)
       for (uint16_t index : frostCells[cx + cz * 64]) {
         const auto& source = towers[index];
+        if (source.disabledUntil > time)
+          continue;
         float dx = source.x - x, dz = source.z - z;
         if (dx * dx + dz * dz <= 40 * 40)
           return slow * .5f;
@@ -427,6 +468,7 @@ public:
     e.size = s.size;
     e.altitude = s.altitude;
     e.type = species;
+    e.elite = species == Saboteur;
     e.generation = gen;
     e.phase = random.unit() * 2 * PI;
     e.ability = 4 + random.unit() * 4;
@@ -434,7 +476,8 @@ public:
     return i;
   }
   int boss() {
-    Species type = (bossSerial++ % 2 == 0) ? Titan : Queen;
+    constexpr Species bosses[] = {Titan, Queen, Brain};
+    Species type = bosses[bossSerial++ % 3];
     float a = random.unit() * 2 * PI;
     int id = spawn(type, std::sin(a) * 225, std::cos(a) * 225);
     if (id >= 0)
@@ -582,6 +625,12 @@ public:
     }
   }
   void updateTower(Tower& t, float dt) {
+    if (t.disabledUntil > time) {
+      t.pulse = 0;
+      t.spinSpeed *= std::max(0.f, 1 - dt * 5);
+      t.recoil = std::max(0.f, t.recoil - dt * 2.8f);
+      return;
+    }
     if (isSupport(t.type)) {
       t.spin = std::fmod(t.spin + dt * (t.type == FrostTower ? 2.8f : 1.2f), 2 * PI);
       t.pulse = std::max(0.f, t.pulse - dt);
@@ -636,7 +685,8 @@ public:
     if (t.type == Lance) {
       if (t.state == 0) {
         if (ready)
-          t.phase = std::min(6.f, t.phase + dt * towerRate * t.localRate);
+          t.phase = std::min(6.f, t.phase + dt * towerRate * t.localRate *
+                                                (t.amplifiedUntil > time ? 2.f : 1.f));
         if (t.phase >= 6 && ready) {
           t.state = 1;
           t.phase = 3;
@@ -773,11 +823,78 @@ public:
         ++i;
     }
   }
+  // Only elite saboteurs search the (at most 210) occupied hexes, twice per second.
+  // Targets are stable IDs: vector compaction cannot redirect an ongoing attack.
+  bool sabotageTower(Foe& e, float dt) {
+    e.towerSearch -= dt;
+    auto target = towers.end();
+    if (e.towerTarget)
+      target = std::find_if(towers.begin(), towers.end(),
+                            [&](const Tower& t) { return t.id == e.towerTarget; });
+    if (target == towers.end() && e.towerSearch <= 0) {
+      e.towerSearch = .5f;
+      e.sabotage = 0;
+      e.towerTarget = 0;
+      float best = 1e30f;
+      for (auto it = towers.begin(); it != towers.end(); ++it) {
+        float dx = it->x - e.x, dz = it->z - e.z, distance = dx * dx + dz * dz;
+        if (distance < best) {
+          best = distance;
+          target = it;
+        }
+      }
+      if (target != towers.end())
+        e.towerTarget = target->id;
+    }
+    if (target == towers.end()) {
+      e.sabotage = 0;
+      return false;
+    }
+    float dx = target->x - e.x, dz = target->z - e.z, distance = std::hypot(dx, dz);
+    if (distance > 4.05f) {
+      e.sabotage = 0;
+      float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : 1.f);
+      float amount = e.glued > 0 ? 0 : std::min(distance - 4, e.speed * slow * dt);
+      Vec3 next{e.x + dx / distance * amount, 0, e.z + dz / distance * amount};
+      // Slide around the core instead of walking through its cylinder.
+      float r = std::hypot(next.x, next.z), safe = CORE_RADIUS + 3;
+      if (r < safe) {
+        float angle = std::atan2(e.x, e.z);
+        float turn = e.z * dx - e.x * dz;
+        angle += (turn >= 0 ? 1 : -1) * amount / safe;
+        next = {std::sin(angle) * safe, 0, std::cos(angle) * safe};
+      }
+      e.x = next.x;
+      e.z = next.z;
+    } else {
+      e.sabotage += dt;
+      if (e.sabotage + .00001f >= SABOTAGE_TIME) {
+        Vec3 p{target->x, 2, target->z};
+        if (destroyedTowers.size() < MAX_TOWERS)
+          destroyedTowers.push_back(target->type);
+        towers.erase(target);
+        rebuildSupport();
+        ring({p.x, .2f, p.z}, {1, .3f, .05f}, 7, .8f);
+        sparks(p, {1, .45f, .1f}, 24, 18);
+        announce("Sabotażysta zniszczył wieżyczkę!");
+        e.towerTarget = 0;
+        e.sabotage = 0;
+        e.towerSearch = 0;
+      }
+    }
+    return true;
+  }
   void step(float dt) {
     if (paused || dt <= 0)
       return;
     dt = std::min(dt, .1f);
     time += dt;
+    bool supportDirty = false;
+    for (auto& tower : towers)
+      if (tower.disabledUntil > 0 && tower.disabledUntil <= time) {
+        tower.disabledUntil = 0;
+        supportDirty = true;
+      }
     focusTime = std::max(0.f, focusTime - dt);
     for (size_t i = 0; i < active.size();) {
       int id = active[i];
@@ -809,32 +926,53 @@ public:
       e.flash = std::max(0.f, e.flash - dt);
       bool stunned = e.stun > 0;
       e.toxicSlow = std::max(0.f, e.toxicSlow - dt);
+      e.glued = std::max(0.f, e.glued - dt);
       e.stun = std::max(0.f, e.stun - dt);
       if (!stunned)
         e.ability -= dt;
       if (e.poison > 0) {
         float tick = std::min(e.poison, dt);
         e.poison -= tick;
-        hurt(i, e.poisonDps * tick, Venom);
+        hurt(i, (e.poisonDps + (e.type >= Titan ? 100.f : 20.f)) * tick, Venom);
       }
       if (e.burn > 0) {
         float tick = std::min(e.burn, dt);
         e.burn -= tick;
         hurt(i, e.burnDps * tick, Flame);
       }
+      if (stunned)
+        e.sabotage = 0;
       if (e.hp <= 0 || stunned)
+        continue;
+      if (e.type == Saboteur && sabotageTower(e, dt))
         continue;
       float distance = std::hypot(e.x, e.z);
       float stop = CORE_RADIUS + e.size * .25f + 1;
       if (e.type == Spitter)
         stop = 48;
+      if (e.type == SiegeSpitter)
+        stop = SIEGE_RANGE;
       if (distance > stop) {
         float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : 1.f);
-        float amount = std::min(distance - stop, e.speed * slow * dt);
+        float amount = e.glued > 0 ? 0 : std::min(distance - stop, e.speed * slow * dt);
         e.x -= e.x / distance * amount;
         e.z -= e.z / distance * amount;
-      } else
+      } else if (e.type != Spitter && e.type != SiegeSpitter)
         coreDamage += dt * (e.type >= Titan ? 80 : e.elite ? 8 : 4);
+      if (e.type == Brain && e.ability <= 0) {
+        e.ability = BRAIN_INTERVAL;
+        bool hit = false;
+        for (auto& tower : towers) {
+          float dx = tower.x - e.x, dz = tower.z - e.z;
+          if (dx * dx + dz * dz <= BRAIN_RADIUS * BRAIN_RADIUS) {
+            tower.disabledUntil = std::max(tower.disabledUntil, time + BRAIN_DISABLE);
+            hit = true;
+          }
+        }
+        supportDirty |= hit;
+        ring({e.x, .25f, e.z}, {.8f, .25f, 1}, BRAIN_RADIUS, 1.4f);
+        sparks(targetPoint(i), {.7f, .3f, 1}, 18, 12);
+      }
       if (e.type == Queen && distance < 240 && e.ability <= 0) {
         e.ability = 8;
         for (int n = 0; n < 5; ++n) {
@@ -857,6 +995,27 @@ public:
         beam(targetPoint(i), {0, CORE_HEIGHT * .5f, 0}, {.35f, 1, .1f}, .3f, .2f);
         coreDamage += e.elite ? 50 : 25;
       }
+      if (e.type == SiegeSpitter && distance <= SIEGE_RANGE + .1f && e.ability <= 0) {
+        e.ability = 5;
+        // A bounded pool of ballistic acid projectiles, rather than hits every frame.
+        if (enemyShots.size() < 512)
+          enemyShots.push_back(
+              {targetPoint(i), 0, std::max(.8f, distance / 35), e.elite ? 90.f : 45.f});
+        sparks(targetPoint(i), {.4f, 1, .08f}, 4, 3);
+      }
+    }
+    if (supportDirty)
+      rebuildSupport();
+    for (size_t n = 0; n < enemyShots.size();) {
+      auto& shot = enemyShots[n];
+      shot.age += dt;
+      if (shot.age >= shot.duration) {
+        coreDamage += shot.damage;
+        sparks({0, CORE_HEIGHT * .5f, 0}, {.35f, 1, .1f}, 7, 8);
+        enemyShots[n] = enemyShots.back();
+        enemyShots.pop_back();
+      } else
+        ++n;
     }
     grid.rebuild(foes, active);
     for (auto& t : towers)

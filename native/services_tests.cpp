@@ -106,26 +106,28 @@ int main() {
       quiet(s);
       int center = enemy(s, Titan, 42, 36), near = enemy(s, Crawler, 50, 36),
           outside = enemy(s, Crawler, 53, 36);
+      for (int id : {center, near, outside})
+        s.world.foes[id].hp = s.world.foes[id].maxHp = 100000;
       menu(s, 1);
       require(s.chooseService(0) && s.targetService({42, 0, 36}), "Cannot order targeted beam");
       require(s.expedition.servicePoints == 0, "Brimstone did not charge one point");
       tick(s, 2.9f);
-      require(s.world.foes[center].hp == 10000, "Beam damages before 3-second warning");
+      require(s.world.foes[center].hp == 100000, "Beam damages before 3-second warning");
       tick(s, .3f);
       float hp = s.world.foes[center].hp, age = s.services.casts.front().age;
-      require(hp < 10000, "Beam never activates");
+      require(hp == 90000 && s.world.brimstonePulses == 1, "Beam first 10000-damage pulse missing");
       s.world.paused = true;
       tick(s, 2);
       require(s.world.foes[center].hp == hp && s.services.casts.front().age == age,
               "Pause advances beam / damage");
       s.world.paused = false;
       tick(s, 3.1f);
-      require(std::abs(s.world.foes[center].hp - 1000) < 1 &&
-                  std::abs(s.world.foes[near].hp - 1000) < 1 && s.world.foes[outside].hp == 10000 &&
-                  s.services.casts.empty(),
-              "Beam is not exactly 9000 damage in 10 m / 3 seconds");
+      require(std::abs(s.world.foes[center].hp - 40000) < 1 && s.world.brimstonePulses == 6 &&
+                  std::abs(s.world.foes[near].hp - 40000) < 1 &&
+                  s.world.foes[outside].hp == 100000 && s.services.casts.empty(),
+              "Beam does not deal six 10000-damage pulses in 10m");
       std::cout
-          << "PASS Brimstone delay, real 3000 DPS x 3 seconds, 10 m radius, pause and completion\n";
+          << "PASS Brimstone delay, six 10000-damage pulses, 10m radius, pause and completion\n";
     }
     {
       Session s(true, true);
@@ -167,7 +169,8 @@ int main() {
       s.expedition.levels[size_t(Upgrade::Sentry)] = 1;
       s.expedition.levels[size_t(Upgrade::RateRelayTower)] = 1;
       require(s.world.towers.front().localRate == 1.2f, "Support fixture failed");
-      int victim = enemy(s, Titan, q.x, q.z), outside = enemy(s, Crawler, q.x + 10.5f, q.z);
+      int victim = enemy(s, Titan, q.x, q.z), outside = enemy(s, Crawler, q.x + 40.5f, q.z);
+      s.world.foes[victim].hp = s.world.foes[victim].maxHp = 100000;
       menu(s, 2);
       require(s.chooseService(2), "Cannot select overload");
       require(!s.targetService({0, 0, 0}, 0) && s.expedition.servicePoints == 2,
@@ -184,8 +187,9 @@ int main() {
       require(s.world.towers.size() == 1 && s.world.towers.front().localRate == 1 &&
                   s.slotAvailable(supportSlot),
               "Overload does not remove support and rebuild neighbours");
-      require(s.world.foes[victim].hp == 2000 && s.world.foes[outside].hp == 10000,
-              "Overload ignores actual hex boundary");
+      require(s.world.foes[victim].hp == 50000 && s.world.foes[outside].hp == 10000 &&
+                  s.world.overloadBlasts == 1,
+              "Overload 50000 damage / 40m radius wrong");
       require(s.expedition.chosenTypes(true) == 1 && s.expedition.eligible(Upgrade::RateRelayTower),
               "Destroyed type forgotten or cannot be reacquired");
       s.servicesOpen = true;
@@ -195,8 +199,9 @@ int main() {
       require(s.world.towers.empty() && s.expedition.acquiredTowers() == 0 &&
                   s.expedition.chosenTypes(false) == 1 && s.expedition.eligible(Upgrade::Sentry),
               "Final sacrifice does not free slot / retain combat technology");
-      std::cout << "PASS overload target validity, reservation, 8000 hex damage, support removal "
-                   "and retained technology\n";
+      std::cout
+          << "PASS overload target validity, reservation, 50000 damage / 40m, support removal "
+             "and retained technology\n";
     }
     {
       Session s(true, true);

@@ -5,6 +5,10 @@
 #include "service_scene.hpp"
 #include "game_audio.hpp"
 #include "manual_monitor.hpp"
+#include "music_player.hpp"
+#include "jukebox_scene.hpp"
+#include "upgrade_lab.hpp"
+#include "bestiary.hpp"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -17,6 +21,13 @@ inline int run(int argc, char** argv) {
   bool frontierTest = false, frontierLab = false;
   bool servicesTest = false, servicesLab = false;
   bool manualTest = false;
+  bool radioTest = false;
+  bool plasmaTest = false;
+  bool coolingTest = false;
+  bool enemyTest = false;
+  bool coreTest = false;
+  bool revisionTest = false;
+  bool legendsTest = false;
   for (int i = 1; i < argc; ++i) {
     test |= std::string(argv[i]) == "--command-test";
     testMini |= std::string(argv[i]) == "--minigun";
@@ -30,13 +41,25 @@ inline int run(int argc, char** argv) {
     servicesTest |= std::string(argv[i]) == "--services-test";
     servicesLab |= std::string(argv[i]) == "--services-lab";
     manualTest |= std::string(argv[i]) == "--manual-test";
+    radioTest |= std::string(argv[i]) == "--radio-test";
+    plasmaTest |= std::string(argv[i]) == "--plasma-test";
+    coolingTest |= std::string(argv[i]) == "--cooling-test";
+    enemyTest |= std::string(argv[i]) == "--enemy-test";
+    coreTest |= std::string(argv[i]) == "--core-test";
+    revisionTest |= std::string(argv[i]) == "--revision-test";
+    legendsTest |= std::string(argv[i]) == "--legends-test";
   }
+  plasmaTest |= coolingTest;
+  revisionTest |= legendsTest;
+  manualTest |= revisionTest;
   upgradeTest |= supportTest;
   deliveryTest |= upgradeTest;
   progressionTest |= deliveryTest;
-  test |= progressionTest || frontierTest || servicesTest || manualTest;
+  test |= progressionTest || frontierTest || servicesTest || manualTest || radioTest ||
+          plasmaTest || enemyTest || coreTest;
   progressionLab |= frontierLab;
-  const bool liveExpedition = !test || progressionTest || frontierTest || servicesTest;
+  const bool liveExpedition = !test || progressionTest || frontierTest || servicesTest ||
+                              radioTest || plasmaTest || enemyTest || coreTest;
   try {
     check(CoInitializeEx(nullptr, COINIT_MULTITHREADED), "COM initialization");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
@@ -49,7 +72,14 @@ inline int run(int argc, char** argv) {
     } runtime;
     auto root = std::filesystem::current_path(), assets = root / "public" / "assets";
     auto artifacts = root / "artifacts" / "command" /
-                     (manualTest     ? "manual"
+                     (legendsTest    ? "manual-legends"
+                      : revisionTest ? "manual-revision"
+                      : coreTest     ? "core"
+                      : enemyTest    ? "enemies"
+                      : coolingTest  ? "cooling"
+                      : plasmaTest   ? "plasma"
+                      : radioTest    ? "radio"
+                      : manualTest   ? "manual"
                       : servicesTest ? "services"
                       : frontierTest ? "frontier"
                       : supportTest  ? "supports"
@@ -75,9 +105,18 @@ inline int run(int argc, char** argv) {
     SentryDropScene dropScene(renderer);
     FrontierScene frontierScene(renderer, assets);
     SniperMonitor sniperMonitor;
+    JukeboxScene jukebox;
+    UpgradeLab upgradeLab;
+    Bestiary bestiary;
+    bool bestiaryPausePass = false, bestiarySpawnPass = false, enemyResumePass = false;
+    float bestiaryFrozenTime = 0;
+    bool coreRegenPass = false, coreLabPass = false, corePausePass = false;
+    bool corePauseMenuPass = false;
+    float coreFrozenHp = 0, coreStartHp = 0, coreStartTime = 0;
     CommandUi ui;
     ui.resize(width, height);
     GameAudio audio;
+    MusicPlayer music(root / "public" / "music", test);
     if (test)
       audio.enabled = false;
     auto session = std::make_unique<Session>(liveExpedition);
@@ -99,8 +138,15 @@ inline int run(int argc, char** argv) {
     float fps = 60;
     int stage = 0, fixture = -1;
     int manualIndex = 0;
+    bool revisionReservePass = false, revisionFlamePass = false, revisionFlameSent = false;
+    bool revisionPourSeen = false, revisionNozzleUp = false;
+    std::array<bool, 6> legendsInstalled{};
+    bool legendsTeslaSent = false, legendsTeslaPass = false;
     std::array<bool, GUN_COUNT> manualChecks{};
     bool manualSightShot = false, manualModelShot = false;
+    bool radioDeployed = false, radioControls = false;
+    bool plasmaLabPass = false;
+    bool coolingMistPass = false;
     double stageAt = 0;
     bool menuShot = false, liftShot = false, combatShot = false, roofShot = false;
     bool pausedPass = false, raisedPass = false, returnedPass = false, noBuildPass = true;
@@ -157,7 +203,7 @@ inline int run(int argc, char** argv) {
             (uint32_t(Clock::now().time_since_epoch().count()) ^ 0x9E3779B9u) | 1u;
       session->start(session->module.kind);
       // Legacy integration tests begin after the new physical start-button interaction.
-      if (test && liveExpedition && !servicesTest)
+      if (test && liveExpedition && !servicesTest && !radioTest)
         session->startExtraction();
       if (servicesLab) {
         session->expedition.hp = session->expedition.maxHp = 20000;
@@ -185,7 +231,7 @@ inline int run(int argc, char** argv) {
                {Upgrade::RateRelayTower, Upgrade::RangeRelayTower, Upgrade::FrostSupportTower},
                {Rarity::Rare, Rarity::Rare, Rarity::Rare}});
         session->expedition.rewards.push_back({3,
-                                               {Upgrade::Radar, Upgrade::Frost, Upgrade::Focus},
+                                               {Upgrade::Nanobots, Upgrade::Frost, Upgrade::Focus},
                                                {Rarity::Rare, Rarity::Rare, Rarity::Rare}});
         session->expedition.rewards.push_back({4,
                                                {Upgrade::Frost, Upgrade::Focus, Upgrade::Purge},
@@ -204,8 +250,8 @@ inline int run(int argc, char** argv) {
         session->frontier.nextElite = 155;
         session->expedition.rewards.clear();
         std::array<std::array<Upgrade, 3>, 6> cards{
-            {{Upgrade::RoverFactory, Upgrade::Radar, Upgrade::Hull},
-             {Upgrade::Radar, Upgrade::Frost, Upgrade::Focus},
+            {{Upgrade::RoverFactory, Upgrade::Nanobots, Upgrade::Hull},
+             {Upgrade::Nanobots, Upgrade::Frost, Upgrade::Focus},
              {Upgrade::RoverBatch, Upgrade::RoverRate, Upgrade::Hull},
              {Upgrade::RateRelayTower, Upgrade::RangeRelayTower, Upgrade::FrostSupportTower},
              {Upgrade::Sentry, Upgrade::TeslaTower, Upgrade::LanceTower},
@@ -218,6 +264,7 @@ inline int run(int argc, char** argv) {
             "POLIGON EKSPEDYCJI: boss za 30 s. Fabryka i radar czekają przy komputerze.");
       }
       audio.reset();
+      music.reset();
       accumulator = 0;
       SDL_SetWindowRelativeMouseMode(window.get(), true);
     };
@@ -231,6 +278,7 @@ inline int run(int argc, char** argv) {
       release();
       session = std::make_unique<Session>(liveExpedition);
       audio.reset();
+      music.reset();
       help = false;
       accumulator = 0;
       deathHandled = false;
@@ -254,6 +302,7 @@ inline int run(int argc, char** argv) {
         return;
       }
       if (!session->expedition.enabled || session->terminalOpen || session->servicesOpen ||
+          session->radioOpen || session->upgradeLabOpen || session->bestiaryOpen ||
           session->expedition.dead())
         return;
       session->tactical = !session->tactical;
@@ -300,6 +349,295 @@ inline int run(int argc, char** argv) {
       double dt = std::min(.1, std::chrono::duration<double>(now - last).count());
       last = now;
       double wall = std::chrono::duration<double>(now - begin).count();
+      if (coreTest) {
+        if (stage == 0 && wall > .3) {
+          click(ui.launch());
+          stage = 1;
+        } else if (stage == 1 && session->mode == Mode::Walking) {
+          for (int id : session->world.active)
+            session->world.foes[id].hp = 0;
+          session->spawnTimer = session->frontier.nextBoss = session->frontier.nextElite = 100000;
+          session->expedition.hp = coreStartHp = 900;
+          session->expedition.uranium = 52;
+          for (int i = 0; i < 3; ++i)
+            session->expedition.addReward();
+          session->expedition.servicePoints = 2;
+          coreStartTime = session->world.time;
+          capture = "core-01-command-center.png";
+          stageAt = wall;
+          stage = 2;
+        } else if (stage == 2 && wall - stageAt > .4) {
+          capture = "core-02-upgrade-console.png";
+          stage = 3;
+          stageAt = wall;
+        } else if (stage == 3 && wall - stageAt > .4) {
+          capture = "core-03-service-console.png";
+          stage = 4;
+          stageAt = wall;
+        } else if (stage == 4 && wall - stageAt > .4) {
+          float expected = (session->world.time - coreStartTime) * 3;
+          coreRegenPass =
+              expected > 2 && std::abs(session->expedition.hp - coreStartHp - expected) < .05f;
+          key(SDL_SCANCODE_SEMICOLON);
+          stage = 5;
+        } else if (stage == 5 && session->upgradeLabOpen) {
+          SDL_Event text{};
+          text.type = SDL_EVENT_TEXT_INPUT;
+          text.text.text = "nanoboty";
+          SDL_PushEvent(&text);
+          stage = 6;
+        } else if (stage == 6 && upgradeLab.results().size() == 1) {
+          capture = "core-04-nanobots.png";
+          key(SDL_SCANCODE_RETURN);
+          stage = 7;
+        } else if (stage == 7 && session->expedition.regeneration == 6) {
+          coreLabPass = session->expedition.levels[size_t(Upgrade::Nanobots)] == 1;
+          coreFrozenHp = session->expedition.hp;
+          stageAt = wall;
+          stage = 8;
+        } else if (stage == 8 && wall - stageAt > .4) {
+          corePausePass = session->expedition.hp == coreFrozenHp;
+          key(SDL_SCANCODE_SEMICOLON);
+          stage = 9;
+          stageAt = wall;
+        } else if (stage == 9 && wall - stageAt > .3) {
+          capture = "core-05-uranium-pump.png";
+          stage = 10;
+          stageAt = wall;
+        } else if (stage == 10 && wall - stageAt > .4) {
+          capture = "core-06-pump-animation.png";
+          stage = 11;
+          stageAt = wall;
+        } else if (stage == 11 && wall - stageAt > .2) {
+          session->expedition.hp = 650;
+          capture = "core-09-yellow-alert.png";
+          stageAt = wall;
+          stage = 110;
+        } else if (stage == 110 && wall - stageAt > .25) {
+          session->expedition.hp = 200;
+          capture = "core-10-red-alert.png";
+          stageAt = wall;
+          stage = 111;
+        } else if (stage == 111 && wall - stageAt > .3) {
+          key(SDL_SCANCODE_P);
+          stage = 12;
+        } else if (stage == 12 && session->world.paused) {
+          capture = "core-07-pause-menu.png";
+          stageAt = wall;
+          stage = 13;
+        } else if (stage == 13 && wall - stageAt > .25) {
+          click(ui.pauseResumeButton());
+          stage = 14;
+        } else if (stage == 14 && !session->world.paused) {
+          corePauseMenuPass = true;
+          key(SDL_SCANCODE_P);
+          stage = 15;
+        } else if (stage == 15 && session->world.paused) {
+          click(ui.pauseMenuButton());
+          stage = 16;
+        } else if (stage == 16 && session->mode == Mode::Selection) {
+          corePauseMenuPass &= !session->world.paused && session->shots == 0 &&
+                               session->expedition.uranium == 0 &&
+                               session->expedition.selected == 0;
+          capture = "core-08-main-menu.png";
+          stageAt = wall;
+          stage = 17;
+        } else if (stage == 17 && wall - stageAt > .15)
+          running = false;
+        if (wall > 15)
+          running = false;
+      }
+      if (enemyTest) {
+        if (stage == 0 && wall > .3) {
+          click(ui.launch());
+          stage = 1;
+        } else if (stage == 1 && session->mode == Mode::Walking) {
+          key(SDL_SCANCODE_APOSTROPHE);
+          stage = 2;
+        } else if (stage == 2 && session->bestiaryOpen) {
+          bestiaryFrozenTime = session->world.time;
+          stageAt = wall;
+          capture = "enemies-01-bestiary.png";
+          click(Bestiary::card(ui, Saboteur));
+          click(Bestiary::card(ui, SiegeSpitter));
+          click(Bestiary::card(ui, Brain));
+          stage = 3;
+        } else if (stage == 3 && wall - stageAt > .5) {
+          bestiaryPausePass = session->world.time == bestiaryFrozenTime;
+          bestiarySpawnPass = session->frontier.spawned[Saboteur] == 1 &&
+                              session->frontier.spawned[SiegeSpitter] == 1 &&
+                              session->frontier.spawned[Brain] == 1;
+          key(SDL_SCANCODE_APOSTROPHE);
+          stage = 4;
+        } else if (stage == 4 && !session->bestiaryOpen) {
+          session->tactical = true;
+          for (int id : session->world.active) {
+            auto& foe = session->world.foes[id];
+            foe.speed = 0;
+            foe.ability = .15f;
+            foe.x = foe.type == Saboteur ? 87 : foe.type == Brain ? -63 : 0;
+            foe.z = foe.type == SiegeSpitter ? 63 : 0;
+          }
+          session->world.addTower(Laser, 84, 0);
+          session->world.addTower(Minigun, -42, 0);
+          session->world.addTower(FrostTower, -63, 21);
+          stageAt = wall;
+          stage = 5;
+        } else if (stage == 5 && wall - stageAt > 1) {
+          enemyResumePass =
+              session->world.time > bestiaryFrozenTime &&
+              std::any_of(session->world.towers.begin(), session->world.towers.end(),
+                          [&](const Tower& t) { return t.disabledUntil > session->world.time; });
+          capture = "enemies-02-abilities.png";
+          stage = 6;
+        } else if (stage == 6 && wall - stageAt > 3.4) {
+          capture = "enemies-03-destruction.png";
+          stage = 7;
+        } else if (stage == 7 && wall - stageAt > 3.7) {
+          key(SDL_SCANCODE_APOSTROPHE);
+          stage = 8;
+        } else if (stage == 8 && session->bestiaryOpen) {
+          click(Bestiary::batch(ui, 1));
+          click(Bestiary::card(ui, Runner));
+          stage = 9;
+          stageAt = wall;
+        } else if (stage == 9 && wall - stageAt > .25) {
+          bestiarySpawnPass &= session->frontier.spawned[Runner] == 10;
+          capture = "enemies-04-batch.png";
+          stage = 10;
+        } else if (stage == 10 && wall - stageAt > .5)
+          running = false;
+        if (wall > 15)
+          running = false;
+      }
+      if (plasmaTest) {
+        coolingMistPass |=
+            session->coolantActive &&
+            std::any_of(session->world.particles.begin(), session->world.particles.end(),
+                        [](const auto& p) { return p.style == 1; });
+        if (stage == 0 && wall > .4) {
+          if (coolingTest)
+            click(ui.choice(1));
+          click(ui.launch());
+          stage = 1;
+        } else if (stage == 1 && session->mode == Mode::Walking) {
+          key(SDL_SCANCODE_SEMICOLON);
+          stage = 2;
+        } else if (stage == 2 && session->upgradeLabOpen) {
+          SDL_Event text{};
+          text.type = SDL_EVENT_TEXT_INPUT;
+          text.text.text = coolingTest ? "cooling" : "eksperymentalna";
+          SDL_PushEvent(&text);
+          stage = 3;
+          stageAt = wall;
+        } else if (stage == 3 && wall - stageAt > .2) {
+          plasmaLabPass = upgradeLab.results().size() == 1 &&
+                          upgradeLab.results()[0] ==
+                              (coolingTest ? Upgrade::ExtremeCooling : Upgrade::PlasmaMortar);
+          capture = coolingTest ? "cooling-01-laboratory.png" : "plasma-01-laboratory.png";
+          key(SDL_SCANCODE_RETURN);
+          stage = 4;
+          stageAt = wall;
+        } else if (stage == 4 &&
+                   (coolingTest ? session->module.extremeCooling : session->module.plasma) &&
+                   wall - stageAt > .2) {
+          key(SDL_SCANCODE_SEMICOLON);
+          session->player = {0, CORE_HEIGHT + 1.72f, -3.8f};
+          session->yaw = 0;
+          session->pitch = -.08f;
+          key(SDL_SCANCODE_E);
+          stage = 5;
+        } else if (stage == 5 && session->mode == Mode::Mounted) {
+          session->world = Game(false);
+          session->world.autoWaves = false;
+          session->spawnTimer = session->frontier.nextBoss = session->frontier.nextElite = 100000;
+          for (int i = 0; i < 81; ++i) {
+            int id = session->world.spawn(Crawler, (i % 9 - 4) * 5.f, 90 + (i / 9) * 5.f);
+            session->world.foes[id].hp = session->world.foes[id].maxHp = 100000;
+            session->world.foes[id].speed = 0;
+          }
+          session->world.grid.rebuild(session->world.foes, session->world.active);
+          for (int i = 0; i < 4; ++i) {
+            Vec3 d = normalize(Vec3{0, 1.8f, 105} - session->eye());
+            session->yaw = session->gunYaw = std::atan2(d.x, d.z);
+            session->pitch = session->gunPitch = std::asin(d.y);
+          }
+          if (coolingTest)
+            session->barrelHeat = .6f; // Hot-barrel fixture; natural heat is covered by unit tests.
+          firing = true;
+          stage = 6;
+          stageAt = wall;
+        } else if (stage == 6 && wall - stageAt > .2) {
+          capture = coolingTest ? "cooling-02-spray.png" : "plasma-02-salvo.png";
+          stage = 7;
+        } else if (stage == 7 && wall - stageAt > .55) {
+          capture = coolingTest ? "cooling-03-model.png" : "plasma-03-model.png";
+          stage = 8;
+        } else if (stage == 8 && wall - stageAt > 1.4) {
+          capture = coolingTest ? "cooling-04-fire.png" : "plasma-04-impact.png";
+          stage = 9;
+        } else if (stage == 9 && wall - stageAt > 2.3) {
+          firing = false;
+          running = false;
+          stage = 10;
+        }
+        if (wall > 30)
+          running = false;
+      }
+      if (radioTest) {
+        if (stage == 0 && wall > .4) {
+          click(ui.launch());
+          stage = 1;
+        } else if (stage == 1 && session->mode == Mode::Walking) {
+          session->player = {0, CORE_HEIGHT + 1.72f, 5.8f};
+          session->yaw = 0;
+          session->pitch = -.08f;
+          key(SDL_SCANCODE_E);
+          stage = 2;
+        } else if (stage == 2 && session->buttonAge > .9f) {
+          capture = "radio-01-retract.png";
+          stage = 3;
+        } else if (stage == 3 && session->buttonAge > 3.7f &&
+                   music.snapshot().decodedFrames > 1000) {
+          session->pitch = .1f;
+          radioDeployed = session->nearRadio() && !music.snapshot().failed;
+          capture = "radio-02-deployed.png";
+          stage = 4;
+          stageAt = wall;
+        } else if (stage == 4 && wall - stageAt > .5) {
+          key(SDL_SCANCODE_E);
+          stage = 5;
+        } else if (stage == 5 && session->radioOpen) {
+          click(radioButton(ui, 5));
+          click(radioButton(ui, 2));
+          stage = 6;
+          stageAt = wall;
+        } else if (stage == 6 && music.snapshot().track == 1 && wall - stageAt > .5) {
+          radioControls = std::abs(session->radio.volume - .4f) < .001f;
+          capture = "radio-03-controls.png";
+          key(SDL_SCANCODE_SPACE);
+          stage = 7;
+          stageAt = wall;
+        } else if (stage == 7 && wall - stageAt > .25) {
+          radioControls &= !music.snapshot().playing;
+          key(SDL_SCANCODE_SPACE);
+          stage = 8;
+          stageAt = wall;
+        } else if (stage == 8 && wall - stageAt > .3) {
+          radioControls &= music.snapshot().playing;
+          key(SDL_SCANCODE_E);
+          stage = 9;
+          stageAt = wall;
+        } else if (stage == 9 && wall - stageAt > .3) {
+          radioControls &= !session->radioOpen;
+          capture = "radio-04-now-playing.png";
+          stage = 10;
+          stageAt = wall;
+        } else if (stage == 10 && wall - stageAt > .25)
+          running = false;
+        if (wall > 25)
+          running = false;
+      }
       if (manualTest) {
         if (!menuShot) {
           capture = "manual-selection.png";
@@ -315,6 +653,28 @@ inline int run(int argc, char** argv) {
           session->mode = Mode::Mounted;
           session->lift = session->hatch = 1;
           session->spawnTimer = 100000;
+          if (legendsTest) {
+            constexpr Upgrade upgrades[] = {Upgrade::TeslaAmplifier,   Upgrade::PlasmaGlue,
+                                            Upgrade::BouncyMortar,     Upgrade::InstantLock,
+                                            Upgrade::DoubleRangeBonus, Upgrade::DualFlame};
+            for (int i = 0; i < 6; ++i)
+              if (requiredManualGun(upgrades[i]) == session->module.kind)
+                legendsInstalled[i] = session->debugGrant(upgrades[i], Rarity::Legendary);
+            if (session->module.kind == Gun::Arc) {
+              for (int i = 0; i < 3; ++i) {
+                session->world.addTower(Weapon(i), float(i) * 21, 85);
+                session->world.towers.back().cooldown = 1000;
+              }
+            }
+          }
+          if (revisionTest && session->module.kind == Gun::Crank) {
+            session->debugGrant(Upgrade::ExtremeCooling, Rarity::Legendary);
+            session->barrelHeat = .6f;
+          }
+          if (revisionTest && session->module.kind == Gun::Lance) {
+            session->debugGrant(Upgrade::UraniumReserve, Rarity::Legendary);
+            session->expedition.uranium = 30;
+          }
           for (int i = 0; i < 18; ++i) {
             float x = (i % 5 - 2) * 8.f, z = 85 + (i / 5) * 8.f;
             if (manualIndex == int(Gun::Flame)) {
@@ -322,7 +682,7 @@ inline int run(int argc, char** argv) {
               z -= 45;
             }
             int id = session->world.spawn(Crawler, x, z);
-            session->world.foes[id].hp = session->world.foes[id].maxHp = 10000;
+            session->world.foes[id].hp = session->world.foes[id].maxHp = 100000;
             session->world.foes[id].speed = 0;
           }
           session->world.grid.rebuild(session->world.foes, session->world.active);
@@ -339,6 +699,54 @@ inline int run(int argc, char** argv) {
           stageAt = wall;
         } else if (stage == 2) {
           std::string name = "manual-" + std::to_string(manualIndex + 1);
+          if (legendsTest && session->module.kind == Gun::Arc) {
+            if (!legendsTeslaSent && wall - stageAt > 2.9) {
+              SDL_Event e{};
+              e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+              e.button.which = testDevice;
+              e.button.button = SDL_BUTTON_RIGHT;
+              SDL_PushEvent(&e);
+              e.type = SDL_EVENT_MOUSE_BUTTON_UP;
+              SDL_PushEvent(&e);
+              legendsTeslaSent = true;
+            }
+            if (!legendsTeslaPass && std::any_of(session->world.towers.begin(),
+                                                 session->world.towers.end(), [&](const Tower& t) {
+                                                   return t.amplifiedUntil > session->world.time;
+                                                 })) {
+              legendsTeslaPass = true;
+              capture = name + "-boost-model.png";
+            }
+          }
+          if (revisionTest && session->module.kind == Gun::Toxin) {
+            auto cycle = session->toxinCycle();
+            if (cycle.pouring && !revisionPourSeen) {
+              capture = name + "-pouring-model.png";
+              revisionPourSeen = true;
+            } else if (session->shots > 0 && cycle.progress > .92f && cycle.lift > .999f &&
+                       !revisionNozzleUp) {
+              capture = name + "-raised-sight.png";
+              revisionNozzleUp = true;
+            }
+          }
+          if (revisionTest && session->lanceReserveActive && !revisionReservePass) {
+            revisionReservePass = true;
+            capture = name + "-reserve-model.png";
+          }
+          if (revisionTest && session->module.kind == Gun::Flame) {
+            revisionFlamePass |= legendsTest ? session->module.dualFlame && !session->flameFocused
+                                             : session->flameFocused;
+            if (!revisionFlameSent && wall - stageAt > 2.9) {
+              SDL_Event e{};
+              e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+              e.button.which = testDevice;
+              e.button.button = SDL_BUTTON_RIGHT;
+              SDL_PushEvent(&e);
+              e.type = SDL_EVENT_MOUSE_BUTTON_UP;
+              SDL_PushEvent(&e);
+              revisionFlameSent = true;
+            }
+          }
           if (!manualSightShot && wall - stageAt > 2.6) {
             capture = name + "-sight.png";
             manualSightShot = true;
@@ -366,7 +774,8 @@ inline int run(int argc, char** argv) {
         if (wall > 90)
           running = false;
       }
-      if (test && !progressionTest && !frontierTest && !servicesTest && !manualTest) {
+      if (test && !progressionTest && !frontierTest && !servicesTest && !manualTest && !radioTest &&
+          !plasmaTest && !enemyTest && !coreTest) {
         if (stage == 9 && wall - stageAt > .15 && !roofShot) {
           capture = "06-round-roof.png";
           roofShot = true;
@@ -528,7 +937,7 @@ inline int run(int argc, char** argv) {
           serviceBoss = session->world.spawn(Titan, 42, 36);
           serviceOutside = session->world.spawn(Crawler, 53, 36);
           for (int id : {serviceBoss, serviceOutside}) {
-            session->world.foes[id].hp = session->world.foes[id].maxHp = 10000;
+            session->world.foes[id].hp = session->world.foes[id].maxHp = 100000;
             session->world.foes[id].speed = 0;
           }
           session->world.grid.rebuild(session->world.foes, session->world.active);
@@ -537,11 +946,14 @@ inline int run(int argc, char** argv) {
         } else if (stage == 12 && !session->services.casts.empty() &&
                    session->services.casts.front().age > 2.5f) {
           serviceChecks[2] &= session->expedition.servicePoints == 0 &&
-                              session->world.foes[serviceBoss].hp == 10000;
+                              session->world.foes[serviceBoss].hp == 100000;
           capture = "services-07-brimstone-warning.png";
           stage = 13;
         } else if (stage == 13 && session->services.casts.front().age > 3.2f) {
           capture = "services-08-brimstone.png";
+          stage = 130;
+          stageAt = wall;
+        } else if (stage == 130 && wall - stageAt > .12) {
           key(SDL_SCANCODE_P);
           frozen = session->services.casts.front().age;
           serviceHp = session->world.foes[serviceBoss].hp;
@@ -553,8 +965,8 @@ inline int run(int argc, char** argv) {
           key(SDL_SCANCODE_P);
           stage = 15;
         } else if (stage == 15 && session->services.casts.empty()) {
-          serviceChecks[3] &= std::abs(session->world.foes[serviceBoss].hp - 1000) < 1 &&
-                              session->world.foes[serviceOutside].hp == 10000;
+          serviceChecks[3] &= std::abs(session->world.foes[serviceBoss].hp - 40000) < 1 &&
+                              session->world.foes[serviceOutside].hp == 100000;
           session->expedition.servicePoints = 1;
           key(SDL_SCANCODE_TAB);
           key(SDL_SCANCODE_E);
@@ -708,7 +1120,7 @@ inline int run(int argc, char** argv) {
             session->frontier.spawnFoe(session->world, Species(n % 5), -50 + n * 7,
                                        110 + (n % 3) * 20, n == 3);
           session->world.spawn(Queen, -85, 170);
-          session->expedition.levels[size_t(Upgrade::Radar)] = 1;
+
           key(SDL_SCANCODE_TAB);
           stage = 12;
           stageAt = wall;
@@ -788,8 +1200,6 @@ inline int run(int argc, char** argv) {
         } else if (stage == 1 && session->mode == Mode::Walking) {
           // Start just below the real shipping threshold, without replacing the shipping logic.
           session->expedition.uranium = 99.9f;
-          if (upgradeTest)
-            session->expedition.levels[size_t(Upgrade::Radar)] = 1;
           key(SDL_SCANCODE_A);
           stage = 2;
         } else if (stage == 2 && session->player.x <= -6.7f) {
@@ -980,9 +1390,83 @@ inline int run(int argc, char** argv) {
         }
         if (event.type == SDL_EVENT_KEY_UP)
           held[event.key.scancode] = false;
+        if (event.type == SDL_EVENT_TEXT_INPUT && session->upgradeLabOpen)
+          upgradeLab.text(event.text.text);
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
           auto code = event.key.scancode;
           held[code] = true;
+          if (code == SDL_SCANCODE_APOSTROPHE && session->mode != Mode::Selection) {
+            session->bestiaryOpen = !session->bestiaryOpen;
+            session->upgradeLabOpen = false;
+            SDL_StopTextInput(window.get());
+            release();
+            help = false;
+            accumulator = 0;
+            SDL_SetWindowRelativeMouseMode(window.get(),
+                                           !session->bestiaryOpen && !session->tactical &&
+                                               !session->radioOpen && !session->terminalOpen &&
+                                               !session->servicesOpen && !session->world.paused);
+            continue;
+          }
+          if (session->bestiaryOpen) {
+            if (code == SDL_SCANCODE_ESCAPE) {
+              session->bestiaryOpen = false;
+              release();
+              SDL_SetWindowRelativeMouseMode(window.get(),
+                                             !session->tactical && !session->radioOpen &&
+                                                 !session->terminalOpen && !session->servicesOpen &&
+                                                 !session->world.paused);
+            } else if (code == SDL_SCANCODE_LEFT)
+              bestiary.selected = (bestiary.selected + SpeciesCount - 1) % SpeciesCount;
+            else if (code == SDL_SCANCODE_RIGHT)
+              bestiary.selected = (bestiary.selected + 1) % SpeciesCount;
+            else if (code == SDL_SCANCODE_UP || code == SDL_SCANCODE_DOWN)
+              bestiary.selected = (bestiary.selected + 5) % SpeciesCount;
+            else if (code == SDL_SCANCODE_RETURN || code == SDL_SCANCODE_KP_ENTER)
+              bestiary.summon(*session, Species(bestiary.selected));
+            continue;
+          }
+          if (code == SDL_SCANCODE_SEMICOLON && session->mode != Mode::Selection) {
+            session->upgradeLabOpen = !session->upgradeLabOpen;
+            release();
+            help = false;
+            if (session->upgradeLabOpen) {
+              SDL_StartTextInput(window.get());
+              SDL_SetWindowRelativeMouseMode(window.get(), false);
+            } else {
+              SDL_StopTextInput(window.get());
+              SDL_SetWindowRelativeMouseMode(window.get(),
+                                             !session->tactical && !session->radioOpen &&
+                                                 !session->terminalOpen && !session->servicesOpen &&
+                                                 !session->world.paused);
+            }
+            continue;
+          }
+          if (session->upgradeLabOpen) {
+            if ((code == SDL_SCANCODE_A || code == SDL_SCANCODE_BACKSPACE) &&
+                (event.key.mod & SDL_KMOD_CTRL)) {
+              upgradeLab.query.clear();
+              upgradeLab.selected = 0;
+            } else if (code == SDL_SCANCODE_ESCAPE) {
+              session->upgradeLabOpen = false;
+              SDL_StopTextInput(window.get());
+              release();
+              SDL_SetWindowRelativeMouseMode(window.get(),
+                                             !session->tactical && !session->radioOpen &&
+                                                 !session->terminalOpen && !session->servicesOpen &&
+                                                 !session->world.paused);
+            } else if (code == SDL_SCANCODE_UP)
+              upgradeLab.move(-1);
+            else if (code == SDL_SCANCODE_DOWN)
+              upgradeLab.move(1);
+            else if (code == SDL_SCANCODE_BACKSPACE)
+              upgradeLab.backspace();
+            else if (code == SDL_SCANCODE_RETURN || code == SDL_SCANCODE_KP_ENTER)
+              upgradeLab.grant(*session);
+            else if (code == SDL_SCANCODE_TAB)
+              upgradeLab.rarity = Rarity((int(upgradeLab.rarity) + 1) % 5);
+            continue;
+          }
           if (code == SDL_SCANCODE_Q && (event.key.mod & SDL_KMOD_CTRL))
             running = false;
           if (code == SDL_SCANCODE_F11)
@@ -1007,6 +1491,22 @@ inline int run(int argc, char** argv) {
           }
           if (session->expedition.dead())
             continue;
+          if (session->radioOpen) {
+            if (code == SDL_SCANCODE_ESCAPE || code == SDL_SCANCODE_E) {
+              session->radioOpen = false;
+              release();
+              SDL_SetWindowRelativeMouseMode(window.get(), true);
+            } else {
+              int action = code == SDL_SCANCODE_LEFT                                       ? 0
+                           : code == SDL_SCANCODE_SPACE                                    ? 1
+                           : code == SDL_SCANCODE_RIGHT                                    ? 2
+                           : (code == SDL_SCANCODE_MINUS || code == SDL_SCANCODE_KP_MINUS) ? 3
+                           : (code == SDL_SCANCODE_EQUALS || code == SDL_SCANCODE_KP_PLUS) ? 5
+                                                                                           : -1;
+              radioAction(session->radio, music.snapshot(), action);
+            }
+            continue;
+          }
           if (session->terminalOpen || session->servicesOpen) {
             if (code == SDL_SCANCODE_ESCAPE || code == SDL_SCANCODE_E) {
               session->terminalOpen = false;
@@ -1044,8 +1544,9 @@ inline int run(int argc, char** argv) {
           if (code == SDL_SCANCODE_E && !help && !session->world.paused && !session->tactical) {
             if (session->interact()) {
               release();
-              SDL_SetWindowRelativeMouseMode(window.get(),
-                                             !session->terminalOpen && !session->servicesOpen);
+              SDL_SetWindowRelativeMouseMode(window.get(), !session->terminalOpen &&
+                                                               !session->servicesOpen &&
+                                                               !session->radioOpen);
             }
           }
         }
@@ -1054,13 +1555,32 @@ inline int run(int argc, char** argv) {
           session->look(event.motion.xrel * .0024f, -event.motion.yrel * .0024f);
         if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
           firing = false;
-        if (event.type == SDL_EVENT_MOUSE_WHEEL && session->tactical)
+        if (event.type == SDL_EVENT_MOUSE_WHEEL && session->upgradeLabOpen)
+          upgradeLab.move(event.wheel.y > 0 ? -1 : 1);
+        if (event.type == SDL_EVENT_MOUSE_WHEEL && session->tactical && !session->upgradeLabOpen &&
+            !session->bestiaryOpen)
           tacticalView.zoom =
               std::clamp(tacticalView.zoom - event.wheel.y * tacticalView.zoom * .08f, 90.f, 700.f);
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT &&
-            session->tactical)
+            session->toggleManualMode())
+          continue;
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT &&
+            session->tactical && !session->upgradeLabOpen && !session->bestiaryOpen)
           toggleTactical();
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+          if (session->bestiaryOpen) {
+            bestiary.click(ui, *session, event.button.x, event.button.y);
+            continue;
+          }
+          if (session->upgradeLabOpen) {
+            upgradeLab.click(ui, *session, event.button.x, event.button.y);
+            continue;
+          }
+          if (session->radioOpen) {
+            radioAction(session->radio, music.snapshot(),
+                        radioClick(ui, event.button.x, event.button.y));
+            continue;
+          }
           if (session->servicesOpen) {
             chooseService(ui.rewardClick(event.button.x, event.button.y));
             continue;
@@ -1074,16 +1594,24 @@ inline int run(int argc, char** argv) {
               reset();
             continue;
           }
+          if (session->world.paused) {
+            if (!help &&
+                ui.pauseMenuButton().contains(event.button.x / ui.scale, event.button.y / ui.scale))
+              reset();
+            else if (!help && ui.pauseResumeButton().contains(event.button.x / ui.scale,
+                                                              event.button.y / ui.scale))
+              pause();
+            continue;
+          }
           if (!SDL_GetWindowRelativeMouseMode(window.get()) && session->mode != Mode::Selection &&
-              ui.collectorButton(session->expedition.levels[size_t(Upgrade::Radar)] > 0)
-                  .contains(event.button.x / ui.scale, event.button.y / ui.scale)) {
+              ui.collectorButton().contains(event.button.x / ui.scale, event.button.y / ui.scale)) {
             collect(session->frontier.nearestCrystal());
             continue;
           }
           if (session->tactical) {
-            bool radar = session->expedition.levels[size_t(Upgrade::Radar)] > 0;
-            if (ui.collectorButton(radar).contains(event.button.x / ui.scale,
-                                                   event.button.y / ui.scale)) {
+
+            if (ui.collectorButton().contains(event.button.x / ui.scale,
+                                              event.button.y / ui.scale)) {
               collect(session->frontier.nearestCrystal());
               continue;
             }
@@ -1132,7 +1660,7 @@ inline int run(int argc, char** argv) {
       Input input{float(held[SDL_SCANCODE_D]) - float(held[SDL_SCANCODE_A]),
                   float(held[SDL_SCANCODE_W]) - float(held[SDL_SCANCODE_S]),
                   held[SDL_SCANCODE_LSHIFT], firing};
-      if (session->tactical && !help) {
+      if (session->tactical && !help && !session->upgradeLabOpen && !session->bestiaryOpen) {
         tacticalView.move(input.side, input.forward, float(dt), input.fast);
         tacticalView.orbit +=
             (float(held[SDL_SCANCODE_E]) - float(held[SDL_SCANCODE_Q])) * float(dt);
@@ -1153,6 +1681,11 @@ inline int run(int argc, char** argv) {
         deathHandled = true;
       }
       audio.update(session->world);
+      music.sync(session->radio,
+                 session->expedition.enabled && session->expedition.miningStarted &&
+                     session->buttonAge >= 3.45f && !session->expedition.dead(),
+                 session->world.paused, audio.enabled);
+      auto radioStatus = music.snapshot();
       camera.farClip = 5000;
       if (session->tactical && !session->expedition.dead()) {
         tacticalView.camera(camera, float(renderer.width) / renderer.height);
@@ -1198,15 +1731,38 @@ inline int run(int argc, char** argv) {
         camera.eye = {-5.3f, CORE_HEIGHT + 2.0f, -6.0f};
         camera.target = {-6.8f, CORE_HEIGHT + 1.5f, -3.75f};
       }
+      if (capture == "core-01-command-center.png") {
+        camera.eye = {3.5f, CORE_HEIGHT + 3.1f, 4.5f};
+        camera.target = {0, CORE_HEIGHT + 1.5f, -6};
+      }
+      if (capture == "core-02-upgrade-console.png" || capture == "core-03-service-console.png") {
+        float side = capture == "core-02-upgrade-console.png" ? -1.f : 1.f;
+        Vec3 center{side * 6.8f, CORE_HEIGHT + 1.8f, -3.5f};
+        float angle = consoleYaw(side);
+        camera.eye = center + Vec3{-std::sin(angle) * 3.7f, .55f, -std::cos(angle) * 3.7f};
+        camera.target = center;
+      }
+      if (capture == "core-05-uranium-pump.png" || capture == "core-06-pump-animation.png") {
+        camera.eye = {2.5f, CORE_HEIGHT + 2.2f, -6.6f};
+        camera.target = Session::URANIUM_PUMP + Vec3{0, 1.35f, 0};
+      }
+      if (capture == "core-09-yellow-alert.png" || capture == "core-10-red-alert.png") {
+        camera.eye = {3.5f, CORE_HEIGHT + 2.7f, -6.5f};
+        camera.target = {0, CORE_HEIGHT + 2, 4};
+      }
       if (capture == "services-08-brimstone.png" || capture == "services-09-stun.png" ||
-          capture == "services-10-overload.png") {
+          capture == "services-10-overload.png" || capture == "services-11-cleared-hex.png") {
         camera.eye = {66, 34, 1};
         camera.target = {42, 4, 36};
       }
-      if (manualTest && capture.find("-model.png") != std::string::npos) {
+      if ((manualTest || plasmaTest) && capture.find("-model.png") != std::string::npos) {
         camera.eye = {7, session->baseHeight() + 5, -6};
         camera.target = session->gunPoint({0, 0, 1.4f});
       }
+      Vec3 shake = session->criticalShake();
+      camera.eye = camera.eye + shake;
+      camera.target = camera.target + shake;
+      ui.radarHeading = std::atan2(camera.target.x - camera.eye.x, camera.target.z - camera.eye.z);
       camera.matrix(float(renderer.width) / renderer.height);
       float mouseX = 0, mouseY = 0;
       SDL_GetMouseState(&mouseX, &mouseY);
@@ -1222,12 +1778,21 @@ inline int run(int argc, char** argv) {
       dropScene.append(scene, *session);
       buildSlotOverlay(scene, *session, hoveredSlot);
       frontierScene.append(scene, *session, hoveredCrystal);
+      jukebox.append(scene, *session, radioStatus, float(dt));
       appendServiceEffects(scene, *session, {tacticalView.placeX, 0, tacticalView.placeZ},
                            hoveredSlot);
       scene.render(renderer);
       sniperMonitor.draw(renderer, *session);
-      ui.drawCommand(renderer, *session, fps, SDL_GetWindowRelativeMouseMode(window.get()), help,
-                     audio.enabled, hoveredSlot, hoveredCrystal);
+      jukebox.draw(renderer);
+      if (session->bestiaryOpen)
+        bestiary.draw(ui, renderer, scene, *session);
+      else if (session->upgradeLabOpen)
+        upgradeLab.draw(ui, renderer, *session);
+      else if (session->radioOpen)
+        drawRadioPanel(ui, renderer, *session, radioStatus);
+      else
+        ui.drawCommand(renderer, *session, fps, SDL_GetWindowRelativeMouseMode(window.get()), help,
+                       audio.enabled, hoveredSlot, hoveredCrystal);
       renderer.end();
       if (!capture.empty()) {
         renderer.screenshot(artifacts / capture);
@@ -1244,15 +1809,77 @@ inline int run(int argc, char** argv) {
       }
     }
     release();
+    if (coreTest) {
+      bool pass = stage == 17 && coreRegenPass && coreLabPass && corePausePass && corePauseMenuPass;
+      std::ofstream out(artifacts / "core-result.json");
+      out << "{\n  \"passed\": " << (pass ? "true" : "false")
+          << ",\n  \"base_regeneration\": " << (coreRegenPass ? "true" : "false")
+          << ",\n  \"nanobot_installation\": " << (coreLabPass ? "true" : "false")
+          << ",\n  \"menu_freezes_healing\": " << (corePausePass ? "true" : "false")
+          << ",\n  \"pause_resume_and_main_menu\": " << (corePauseMenuPass ? "true" : "false")
+          << ",\n  \"regeneration\": " << session->expedition.regeneration << "\n}\n";
+      std::cout << "CORE " << (pass ? "PASS" : "FAIL") << " stage=" << stage << '\n';
+      return pass ? 0 : 1;
+    }
+    if (enemyTest) {
+      bool pass = stage == 10 && bestiaryPausePass && bestiarySpawnPass && enemyResumePass;
+      std::ofstream out(artifacts / "enemies-result.json");
+      out << "{\n  \"passed\": " << (pass ? "true" : "false")
+          << ",\n  \"menu_freezes_time\": " << (bestiaryPausePass ? "true" : "false")
+          << ",\n  \"click_spawns_and_batch\": " << (bestiarySpawnPass ? "true" : "false")
+          << ",\n  \"resume_and_brain_pulse\": " << (enemyResumePass ? "true" : "false") << "\n}\n";
+      std::cout << "ENEMIES " << (pass ? "PASS" : "FAIL") << " stage=" << stage << '\n';
+      return pass ? 0 : 1;
+    }
+    if (plasmaTest) {
+      bool pass =
+          stage == 10 && plasmaLabPass &&
+          (coolingTest ? session->module.extremeCooling && coolingMistPass && session->shots >= 120
+                       : session->module.plasma) &&
+          session->impacts > 0 && session->shots > 0;
+      std::ofstream out(artifacts / (coolingTest ? "cooling-result.json" : "plasma-result.json"));
+      out << "{\n  \"passed\": " << (pass ? "true" : "false")
+          << ",\n  \"search_and_install\": " << (plasmaLabPass ? "true" : "false")
+          << ",\n  \"volleys\": " << session->shots << ",\n  \"impacts\": " << session->impacts
+          << "\n}\n";
+      std::cout << (coolingTest ? "COOLING " : "PLASMA ") << (pass ? "PASS" : "FAIL")
+                << " stage=" << stage << '\n';
+      return pass ? 0 : 1;
+    }
+    if (radioTest) {
+      bool pass = stage == 10 && radioDeployed && radioControls;
+      std::ofstream out(artifacts / "radio-result.json");
+      out << "{\n  \"passed\": " << (pass ? "true" : "false")
+          << ",\n  \"deployed_and_playing\": " << (radioDeployed ? "true" : "false")
+          << ",\n  \"controls\": " << (radioControls ? "true" : "false")
+          << ",\n  \"decoded_frames\": " << music.snapshot().decodedFrames << "\n}\n";
+      std::cout << "RADIO " << (pass ? "PASS" : "FAIL") << " stage=" << stage << '\n';
+      return pass ? 0 : 1;
+    }
     if (manualTest) {
       bool pass =
           manualIndex == GUN_COUNT && sniperMonitor.frames > 0 &&
           std::all_of(manualChecks.begin(), manualChecks.end(), [](bool value) { return value; });
+      if (revisionTest)
+        pass &= revisionReservePass && revisionFlamePass && revisionPourSeen && revisionNozzleUp;
+      if (legendsTest)
+        pass &= legendsTeslaPass && std::all_of(legendsInstalled.begin(), legendsInstalled.end(),
+                                                [](bool b) { return b; });
       std::ofstream out(artifacts / "manual-result.json");
       out << "{\n  \"passed\": " << (pass ? "true" : "false") << ",\n  \"weapons\": [";
       for (int i = 0; i < GUN_COUNT; ++i)
         out << (i ? ", " : "") << (manualChecks[i] ? "true" : "false");
-      out << "],\n  \"sniper_monitor_frames\": " << sniperMonitor.frames << "\n}\n";
+      out << "],\n  \"uranium_reserve\": " << (revisionReservePass ? "true" : "false")
+          << ",\n  \"six_legends_installed\": "
+          << (std::all_of(legendsInstalled.begin(), legendsInstalled.end(),
+                          [](bool b) { return b; })
+                  ? "true"
+                  : "false")
+          << ",\n  \"friendly_tesla_chain\": " << (legendsTeslaPass ? "true" : "false")
+          << ",\n  \"nozzle_fill_and_raise\": "
+          << (revisionPourSeen && revisionNozzleUp ? "true" : "false")
+          << ",\n  \"flame_right_click\": " << (revisionFlamePass ? "true" : "false")
+          << ",\n  \"sniper_monitor_frames\": " << sniperMonitor.frames << "\n}\n";
       std::cout << "MANUAL ARSENAL " << (pass ? "PASS" : "FAIL") << '\n';
       return pass ? 0 : 1;
     }
@@ -1300,7 +1927,7 @@ inline int run(int argc, char** argv) {
                   dropPausePass && landedPass && balloonPass && returnViewPass;
       if (upgradeTest)
         pass &= (supportTest ? supportVisualPass : session->world.fired[Tesla] > 0) &&
-                session->expedition.levels[size_t(Upgrade::Radar)] == 1;
+                session->expedition.enabled;
       std::ofstream out(artifacts / (supportTest   ? "support-result.json"
                                      : upgradeTest ? "upgrade-result.json"
                                                    : "delivery-result.json"));
@@ -1318,12 +1945,10 @@ inline int run(int argc, char** argv) {
         details << "{\n  \"support_links\": " << session->world.supportLinks.size()
                 << ",\n  \"blizzard_pulse\": " << (supportVisualPass ? "true" : "false")
                 << ",\n  \"radar_tv_unlocked\": "
-                << (session->expedition.levels[size_t(Upgrade::Radar)] == 1 ? "true" : "false")
-                << "\n}\n";
+                << (session->expedition.enabled ? "true" : "false") << "\n}\n";
       } else if (upgradeTest) {
         std::ofstream details(artifacts / "upgrade-details.json");
-        details << "{\n  \"radar_unlocked\": "
-                << (session->expedition.levels[size_t(Upgrade::Radar)] == 1 ? "true" : "false")
+        details << "{\n  \"radar_unlocked\": " << (session->expedition.enabled ? "true" : "false")
                 << ",\n  \"delivered_weapon\": \"Tesla\",\n  \"tesla_shots\": "
                 << session->world.fired[Tesla] << "\n}\n";
       }

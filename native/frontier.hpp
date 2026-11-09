@@ -192,19 +192,27 @@ struct Frontier {
       collectorState = CollectorState::Inbound;
     }
   }
+  static float spawnHp(Species type, float time, bool elite = false) {
+    float scale = type == Crawler ? 1 : 1 + std::max(0.f, time - 120) / 1200;
+    return SPECIES[type].hp * scale * (elite && type != Saboteur ? 4 : 1);
+  }
+  static float spawnSpeed(Species type, float time, bool elite = false) {
+    constexpr float speeds[] = {3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f};
+    static_assert(std::size(speeds) == SpeciesCount);
+    return (speeds[type] + (type <= Runner ? std::min(time / 120, 4.f) : 0)) *
+           (elite && type != Saboteur ? .9f : 1.f);
+  }
   int spawnFoe(Game& g, Species type, float x, float z, bool elite = false) {
     int id = g.spawn(type, x, z);
     if (id < 0)
       return id;
     auto& foe = g.foes[id];
-    float scale = type == Crawler ? 1 : 1 + std::max(0.f, g.time - 120) / 1200;
-    foe.hp = foe.maxHp = SPECIES[type].hp * scale * (elite ? 4 : 1);
-    constexpr float speeds[] = {3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 2.4f, 2.8f};
-    foe.speed = speeds[type] + (type <= Runner ? std::min(g.time / 120, 4.f) : 0);
-    foe.elite = elite;
-    if (elite) {
-      foe.size *= 1.4f;
-      foe.speed *= .9f;
+    foe.hp = foe.maxHp = spawnHp(type, g.time, elite);
+    foe.speed = spawnSpeed(type, g.time, elite);
+    foe.elite = elite || type == Saboteur;
+    if (foe.elite) {
+      if (type != Saboteur)
+        foe.size *= 1.4f;
       ++eliteSpawned;
     }
     ++spawned[type];
@@ -212,6 +220,8 @@ struct Frontier {
   }
   Species waveSpecies(Game& g) {
     int roll = int(g.random.next() % 100);
+    if (g.time >= 300 && roll >= 94)
+      return SiegeSpitter;
     if (g.time >= 240 && roll < 12)
       return Floater;
     if (g.time >= 180 && roll < 24)
@@ -232,8 +242,11 @@ struct Frontier {
       int id = g.boss();
       if (id >= 0) {
         auto& boss = g.foes[id];
-        boss.hp = boss.maxHp = (boss.type == Titan ? 7000.f : 6000.f) + bossesSpawned * 1500;
-        boss.speed = boss.type == Titan ? 2.4f : 2.8f;
+        boss.hp = boss.maxHp = (boss.type == Titan   ? 7000.f
+                                : boss.type == Brain ? 8000.f
+                                                     : 6000.f) +
+                               bossesSpawned * 1500;
+        boss.speed = spawnSpeed(boss.type, g.time);
         ++spawned[boss.type];
         ++bossesSpawned;
         nextBoss += 180;
@@ -243,7 +256,8 @@ struct Frontier {
     }
     if (g.time >= nextElite && g.active.size() < MAX_ACTIVE) {
       float a = g.random.unit() * 2 * PI;
-      spawnFoe(g, waveSpecies(g), std::sin(a) * 235, std::cos(a) * 235, true);
+      Species kind = g.time >= 135 && (eliteSpawned % 2 == 1) ? Saboteur : waveSpecies(g);
+      spawnFoe(g, kind, std::sin(a) * 235, std::cos(a) * 235, true);
       nextElite += 45;
       added = true;
     }

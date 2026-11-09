@@ -1,0 +1,38 @@
+RDZEN - Windows x64 / uruchamianie na Linux przez warstwe zgodnosci
+
+WINDOWS 10/11 x64
+Rozpakuj ZIP i uruchom Rdzen.exe. EXE mozna tez przenosic samodzielnie.
+
+LINUX x86_64 - WINE
+To jest ten sam build Windows, NIE natywny plik wykonywalny Linux.
+Wymaga zainstalowanego Wine 64-bit i sterownikow graficznych.
+Rozpakuj caly ZIP i w jego folderze uruchom:
+    sh ./Uruchom-Linux.sh
+Skrypt nie wymaga chmod, nie instaluje pakietow i nie pobiera plikow.
+Domyslnie tworzy oddzielny prefix w ~/.local/share/rdzen/wine
+(lub $XDG_DATA_HOME/rdzen/wine). WINEPREFIX pozwala wybrac inny.
+RDZEN_WINE pozwala podac sciezke do wlasnego wine/wine64.
+
+LINUX - STEAM PROTON
+Mozesz zamiast skryptu dodac Rdzen.exe jako gre spoza Steam:
+Gry > Dodaj gre spoza Steam > Przegladaj > Rdzen.exe.
+W jej Wlasciwosciach > Zgodnosc wlacz wymuszanie narzedzia Steam Play,
+wybierz zainstalowany Proton i uruchom gre w Steam.
+Proton korzysta z wlasnego prefixu; skrypt Wine nie jest wtedy potrzebny.
+
+GRAFIKA I DZWIEK
+Renderer tej wersji to Direct3D 11. DXVK tlumaczy D3D11 na Vulkan
+dla Wine; Proton zwykle zarzadza tym sam. W Wine konfiguracja DXVK
+zalezy od dystrybucji i sterownikow. Nie zalaczamy DXVK ani Wine do ZIP.
+Radio MP3 korzysta z Media Foundation; obsluga zalezy od Wine/Proton
+i dostepnych kodekow. Test na Windows nie potwierdza obslugi na Linux.
+
+STATUS WERYFIKACJI
+Build i testy graficzne wykonano na Windows. W tym srodowisku brak
+Linux/Wine, wiec dzialanie gry i wydajnosc na Linux sa NIEZWERYFIKOWANE.
+Dolaczony skrypt ulatwia uruchomienie przez warstwe zgodnosci.
+
+Zrodla:
+https://github.com/doitsujin/dxvk
+https://github.com/ValveSoftware/Proton
+https://www.winehq.org/

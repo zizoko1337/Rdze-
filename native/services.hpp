@@ -10,13 +10,13 @@ struct ServiceInfo {
 };
 inline constexpr ServiceInfo SERVICES[] = {
     {"Brimstone",
-     "Wskaż miejsce. Po 3 s wiązka zadaje 3000 obrażeń/s przez 3 s w promieniu 10 m.",
+     "Po 3 s: sześć uderzeń po 10 000 obrażeń, co 0,5 s, w promieniu 10 m.",
      {1, .32f, .12f}},
     {"Fala ogłuszająca",
      "Po 3 s paraliżuje wszystkich obecnych przeciwników na 5 s, także bossów.",
      {.35f, .65f, 1}},
     {"Przeciążenie",
-     "Wskaż własną wieżyczkę. Po 3 s zostaje zniszczona, zadając 8000 obrażeń na swoim heksie.",
+     "Po 3 s poświęca wieżyczkę: 50 000 obrażeń w promieniu 40 m.",
      {1, .55f, .18f}}};
 struct ServiceCast {
   Service type;
@@ -24,6 +24,7 @@ struct ServiceCast {
   uint32_t towerId = 0;
   float age = 0;
   bool triggered = false;
+  int pulses = 0;
 };
 inline bool insideServiceHex(float x, float z, Vec3 center) {
   float dx = std::abs(x - center.x), dz = std::abs(z - center.z);
@@ -58,13 +59,16 @@ struct ServiceSystem {
       return;
     for (size_t i = 0; i < casts.size();) {
       auto& cast = casts[i];
-      float previous = cast.age;
       cast.age += dt;
       if (cast.type == Service::Brimstone) {
-        float overlap = std::max(0.f, std::min(cast.age, 6.f) - std::max(previous, 3.f));
-        if (overlap > 0)
+        while (cast.pulses < 6 && cast.age + .00001f >= 3 + cast.pulses * .5f) {
+          ++cast.pulses;
+          ++g.brimstonePulses;
           g.grid.radius(cast.position.x, cast.position.z, 10, g.foes,
-                        [&](int id) { g.hurt(id, 3000 * overlap, Laser, false); });
+                        [&](int id) { g.hurt(id, 10000, Laser, false); });
+          g.ring(cast.position + Vec3{0, .25f, 0}, {1, .3f, .05f}, 10, .48f);
+          g.sparks(cast.position + Vec3{0, 2, 0}, {1, .65f, .2f}, 14, 28);
+        }
       } else if (!cast.triggered && cast.age >= 3) {
         cast.triggered = true;
         if (cast.type == Service::StunWave) {
@@ -80,12 +84,11 @@ struct ServiceSystem {
             Weapon type = found->type;
             g.removeTower(found->x, found->z);
             e.releaseTower(type);
-            g.grid.radius(cast.position.x, cast.position.z, SLOT_RADIUS, g.foes, [&](int id) {
-              if (insideServiceHex(g.foes[id].x, g.foes[id].z, cast.position))
-                g.hurt(id, 8000, Tesla, false);
-            });
-            g.sparks(cast.position + Vec3{0, 4, 0}, {1, .5f, .1f}, 55, 24);
-            g.ring(cast.position + Vec3{0, .3f, 0}, {1, .4f, .1f}, SLOT_RADIUS, 1.2f);
+            ++g.overloadBlasts;
+            g.grid.radius(cast.position.x, cast.position.z, 40, g.foes,
+                          [&](int id) { g.hurt(id, 50000, Tesla, false); });
+            g.sparks(cast.position + Vec3{0, 4, 0}, {1, .5f, .1f}, 90, 52);
+            g.ring(cast.position + Vec3{0, .3f, 0}, {1, .4f, .1f}, 40, 1.5f);
             g.announce("Przeciążenie. Stanowisko jest wolne; technologia pozostaje odblokowana.");
           } else {
             ++e.servicePoints;
