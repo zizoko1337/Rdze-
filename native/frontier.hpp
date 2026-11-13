@@ -19,7 +19,8 @@ struct Rover {
 enum class CollectorState { Idle, Outbound, Collecting, Inbound };
 struct Frontier {
   static constexpr int MAX_ROVERS = 2048, MAX_CRYSTALS = 4096, MAX_ACTIVE = 6000;
-  static constexpr float ROVER_DAMAGE = SPECIES[Crawler].hp, ROVER_SPEED = 24;
+  static constexpr float SPAWN_MIN = 280, SPAWN_MAX = 320;
+  static constexpr float ROVER_DAMAGE = WEAPONS[Rocket].damage, ROVER_RADIUS = 4, ROVER_SPEED = 24;
   static constexpr Vec3 COLLECTOR_DOCK{-21, 7, -6};
   std::vector<Rover> rovers;
   // Aggregate nearby traffic instead of checking every pair of cars.
@@ -272,7 +273,7 @@ struct Frontier {
       spawnTimer = interval * (respite ? 3 : 1);
       int group = respite ? 1 : 1 + std::min(7, int(g.time / 240));
       for (int i = 0; i < group && g.active.size() < MAX_ACTIVE; ++i) {
-        float a = g.random.unit() * 2 * PI, r = 160 + g.random.unit() * 100;
+        float a = g.random.unit() * 2 * PI, r = SPAWN_MIN + g.random.unit() * (SPAWN_MAX - SPAWN_MIN);
         spawnFoe(g, waveSpecies(g), std::sin(a) * r, std::cos(a) * r);
       }
       added = true;
@@ -343,11 +344,12 @@ struct Frontier {
         float distance = length(delta), contact = foe.size * .43f + .35f;
         float step = ROVER_SPEED * (.92f + float(rover.serial % 17) * .01f) * dt;
         if (distance <= step + contact) {
-          roverDamage += g.hurt(rover.target, ROVER_DAMAGE, Laser, false);
+          Vec3 hit = g.targetPoint(rover.target);
+          roverDamage += g.blast(hit, ROVER_RADIUS, ROVER_DAMAGE, Rocket, .55f, false);
           ++roverHits;
           impact = true;
-          g.sparks(g.targetPoint(rover.target), {.3f, 1, .8f}, 10, 8);
-          g.ring(rover.position, {.3f, .9f, .8f}, 2.5f, .25f); // Cosmetic only, no area query.
+          g.sparks(hit, {.3f, 1, .8f}, 10, 8);
+          g.ring(hit, {.3f, .9f, .8f}, ROVER_RADIUS, .25f);
         } else {
           Vec3 direction = delta * (1 / distance);
           Vec3 separation{};

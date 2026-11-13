@@ -1,5 +1,9 @@
 # Poprawka migotania obrazu — 2026-11-03
 
+## Tekstura bazaltu i ślady trafień — 2026-11-13
+
+Na nowe życzenie dodano subtelną teksturę bazaltowego gruntu. Korzysta z mipmap i filtrowania anizotropowego 16×, zamiast dawnego proceduralnego ziarna. Test ruchu kamery o ułamek piksela pozostaje aktywny. Szczegóły i czasy wygaszania: [Efekty podłoża](EFEKTY_PODLOZA.md).
+
 ## Jednolite podłoże — 2026-11-04
 
 Na życzenie usunięto z podłoża cały proceduralny wzór: ziarnienie i linie. Ziemia ma teraz jednolity, matowy kolor, na który wpływają tylko oświetlenie i mgła. Nie jest próbkowana żadna tekstura podłoża.

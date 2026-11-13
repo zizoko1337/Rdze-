@@ -10,6 +10,7 @@ void setup(Session& s) {
   s.mode = Mode::Mounted;
   s.lift = s.hatch = 1;
   s.module.kind = Gun::Crank;
+  s.expedition.manualKind = Gun::Crank;
   s.expedition.manualLaser = false;
   s.expedition.manualMinigun = true;
   s.spawnTimer = s.frontier.nextBoss = s.frontier.nextElite = 100000;

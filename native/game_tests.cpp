@@ -55,13 +55,13 @@ int main() {
       int a = stationary(g, 50, 0, 1000), b = stationary(g, 35, 20, 1000),
           c = stationary(g, 95, 0, 1000);
       run(g, .2f);
-      require(g.foes[a].hp == 855 && g.foes[b].hp == 855,
+      require(g.foes[a].hp == 840 && g.foes[b].hp == 840,
               "Tesla does not hit every in-range enemy");
       require(g.foes[c].hp == 1000, "Tesla hits outside range");
-      run(g, 4);
-      require(g.foes[a].hp == 855, "Tesla cooldown ignored");
-      run(g, 2);
-      require(g.foes[a].hp == 710, "Tesla did not recharge");
+      run(g, 1);
+      require(g.foes[a].hp == 840, "Tesla cooldown ignored");
+      run(g, 1);
+      require(g.foes[a].hp == 680, "Tesla did not recharge");
       std::cout << "PASS Tesla radius and long cooldown\n";
     }
     {
@@ -100,14 +100,14 @@ int main() {
       g.addTower(Venom, 30, 0);
       int id = stationary(g, 50, 0);
       run(g, 2);
-      require(g.foes[id].poison > 0 && !g.gas.empty(), "Poison cloud missing");
+      require(g.foes[id].towerPoisonDps > 0 && !g.gas.empty(), "Poison cloud missing");
       g.towers.clear();
       g.shots.clear();
       double d = g.damageDone[Venom];
       run(g, 2);
       require(g.damageDone[Venom] > d, "Poison does not persist");
       run(g, 15);
-      require(g.foes[id].poison <= 0 && g.gas.empty(), "Poison never expires");
+      require(g.foes[id].towerPoisonDps <= .001f && g.gas.empty(), "Poison never expires");
       std::cout << "PASS poison clouds, damage over time and expiry\n";
     }
     {

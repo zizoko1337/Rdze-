@@ -140,6 +140,7 @@ void fireArc() {
     if (hit.point.y > .05f || forward().y >= 0)
       return;
     world.sparks(hit.point, module.spec().color, 10, 8);
+    world.groundMarks.spot(hit.point, .65f, 3, .45f);
     visited[count++] = -1; // Ground consumes the first link of the ten-link discharge.
     from = hit.point;
     id = nearest(from);
@@ -224,12 +225,17 @@ void fireRail() {
     }
   world.beam(muzzle(), origin + direction * range, module.spec().color, .16f, .25f);
   world.beam(muzzle(), origin + direction * range, {1, 1, 1}, .05f, .15f);
+  Vec3 end = origin + direction * range;
+  if (direction.y < 0 && std::abs(end.y) < .01f)
+    world.groundMarks.spot(end, .5f, 4, .2f);
 }
 void fireFlameCone(bool focused) {
   Vec3 f = forward();
   float range = focused ? 94.5f : 63.f, halfAngle = focused ? std::atan(2.5f / 94.5f) : .5f;
   Vec3 emitter = module.dualFlame && focused ? gunPoint({-.9f, -.15f, 4.3f}) : muzzle();
   auto hit = trace(world, eye(), f, range + 10);
+  if (hit.id < 0 && f.y < 0 && std::abs(hit.point.y) < .01f && hit.distance <= range)
+    world.groundMarks.spot(hit.point, focused ? .65f : 1.2f, 4.5f, .7f);
   if (hit.id >= 0 &&
       std::hypot(world.foes[hit.id].x - eye().x, world.foes[hit.id].z - eye().z) <= range)
     markTarget(hit.id);
@@ -360,6 +366,8 @@ void stepManualProjectiles(float dt) {
           world.beam(p.pos + Vec3{0, 4, 0}, hit.point, {.2f, .95f, 1}, .13f, .12f);
         }
         world.sparks(hit.point, {.2f, .95f, 1}, 4, 5);
+        if (hit.id < 0)
+          world.groundMarks.spot(p.endpoint, .4f, 3, .6f);
         world.ring(p.endpoint, {.2f, .9f, 1}, 1.3f, .25f);
       } else if (p.kind == Gun::Toxin) {
         if (toxicPatches.size() < 32)
@@ -371,6 +379,8 @@ void stepManualProjectiles(float dt) {
         manualBlast(p.pos, p.kind == Gun::Smart ? 9 : 15, p.damage,
                     p.kind == Gun::Smart ? Rocket : Mortar,
                     world.valid(p.target, p.generation) ? p.target : -1);
+        if (p.pos.y <= 2.5f)
+          world.groundMarks.spot({p.pos.x, 0, p.pos.z}, p.kind == Gun::Smart ? 2.f : 3.5f, 6, .8f);
         if (p.kind == Gun::Howitzer && p.bounces > 0) {
           p.start = p.pos = p.previous = p.endpoint;
           p.endpoint = p.start + p.bounceDirection * (p.bounces == 2 ? 12.f : 8.f);
@@ -390,9 +400,13 @@ void stepManualProjectiles(float dt) {
   }
 }
 void stepLance(float dt, bool held) {
-  if (module.kind != Gun::Lance)
+  if (module.kind != Gun::Lance) {
+    lanceGroundValid = false;
     return;
+  }
   if (!held || mode != Mode::Mounted || tactical) {
+    lanceGroundValid = false;
+    lanceGroundClock = 0;
     lanceCharge = 0;
     if (lanceActive)
       cooldown = module.spec().interval / module.rateMultiplier;
@@ -400,8 +414,10 @@ void stepLance(float dt, bool held) {
     lanceActive = lanceReserveActive = false;
     return;
   }
-  if (cooldown > 0)
+  if (cooldown > 0) {
+    lanceGroundValid = false;
     return;
+  }
   if (!lanceActive) {
     lanceCharge = std::min(1.8f, lanceCharge + dt * module.rateMultiplier);
     if (lanceCharge < 1.8f)
@@ -412,6 +428,7 @@ void stepLance(float dt, bool held) {
     std::fill(lanceTouched.begin(), lanceTouched.end(), 0);
     lanceCharge = 0;
     ++shots;
+    feedback.shot(Gun::Lance);
     ++world.fired[arsenal::Lance];
   }
   float normalTick = std::min(dt, lanceRemaining);
@@ -424,6 +441,20 @@ void stepLance(float dt, bool held) {
     lanceReserveActive = reserveTick > 0;
   }
   auto hit = trace(world, eye(), forward(), module.spec().range);
+  if (tick > 0 && hit.id < 0 && forward().y < 0 && std::abs(hit.point.y) < .01f) {
+    lanceGroundClock -= tick;
+    if (!lanceGroundValid || lanceGroundClock <= 0) {
+      Vec3 from = lanceGroundValid && length(hit.point-lanceGroundPrevious) <= 20
+                      ? lanceGroundPrevious : hit.point;
+      world.groundMarks.stroke(from, hit.point, .34f, 4.5f, 1.6f);
+      lanceGroundPrevious = hit.point;
+      lanceGroundValid = true;
+      lanceGroundClock = 1.f/30;
+    }
+  } else {
+    lanceGroundValid = false;
+    lanceGroundClock = 0;
+  }
   if (hit.id >= 0 && tick > 0) {
     if (lanceTouched[hit.id] != world.foes[hit.id].generation) {
       lanceTouched[hit.id] = world.foes[hit.id].generation;

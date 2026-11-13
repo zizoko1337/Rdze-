@@ -50,11 +50,14 @@ inline Mat multiply(const Mat& a, const Mat& b) {
 }
 struct Camera {
   Vec3 eye{0, 225, -175}, target{0, 0, 0}, right, up;
-  float fov = 60, farClip = 1200;
+  float fov = 60, farClip = 1200, roll = 0;
   Mat matrix(float aspect) {
     Vec3 z = normalize(target - eye);
     right = normalize(cross({0, 1, 0}, z));
     up = cross(z, right);
+    Vec3 baseRight = right;
+    right = baseRight*std::cos(roll)+up*std::sin(roll);
+    up = up*std::cos(roll)-baseRight*std::sin(roll);
     Mat v{{right.x, up.x, z.x, 0, right.y, up.y, z.y, 0, right.z, up.z, z.z, 0, -dot(right, eye),
            -dot(up, eye), -dot(z, eye), 1}};
     float ys = 1 / std::tan(fov * PI / 360), nearPlane = .1f, farPlane = farClip;
@@ -89,8 +92,9 @@ cbuffer Scene : register(b0) {
   row_major float4x4 vp; float4 camRight; float4 camUp; float4 eye; float4 params;
 };
 Texture2D tex : register(t0); SamplerState samp : register(s0);
+SamplerState groundSamp : register(s1);
 struct VSIn {float3 p:POSITION;float3 n:NORMAL;float2 uv:TEXCOORD0;float3 origin:INSTANCE0;float3 scale:INSTANCE1;float yaw:INSTANCE2;float4 color:INSTANCE3;float extra:INSTANCE4;};
-struct VSOut {float4 p:SV_POSITION;float2 uv:TEXCOORD0;float3 normal:TEXCOORD1;float3 world:TEXCOORD2;float4 color:COLOR0;};
+struct VSOut {float4 p:SV_POSITION;float2 uv:TEXCOORD0;float3 normal:TEXCOORD1;float3 world:TEXCOORD2;float4 color:COLOR0;float extra:TEXCOORD3;};
 float3 safeDirection(float3 v,float3 fallback){float sq=dot(v,v);return sq>1e-12?v*rsqrt(max(sq,1e-12)):fallback;}
 float3 beamSide(float3 dir,float3 toEye){
  dir=safeDirection(dir,float3(0,0,1));
@@ -103,18 +107,30 @@ VSOut vsMain(VSIn i){VSOut o;float mode=params.x;float3 p=i.p*i.scale;
  else if(mode==2){float3 dir=safeDirection(float3(i.yaw,0,i.extra),float3(0,0,1));float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+side*p.x+dir*p.y;o.normal=float3(0,1,0);}
  else if(mode==7){float3 dir=float3(i.scale.y,i.scale.z,i.yaw);float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+dir*i.p.y+side*i.p.x*i.scale.x;o.normal=float3(0,1,0);}
  else if(mode==10||mode==12){p=i.origin+float3(i.p.x*i.scale.x,0,i.p.y*i.scale.y);o.normal=float3(0,1,0);}
+ else if(mode==23||mode==24){float x=i.p.x*i.scale.x,z=i.p.y*i.scale.y;float s=sin(i.yaw),c=cos(i.yaw);p=i.origin+float3(x*c+z*s,0,-x*s+z*c);o.normal=float3(0,1,0);}
  else if(mode==14){p=float3(i.origin.x+i.p.x*i.scale.x,.12,i.origin.z+i.p.y*i.scale.y);o.normal=float3(sin(i.yaw)*cos(i.extra),sin(i.extra),cos(i.yaw)*cos(i.extra));}
  else {float pitch=mode==18?i.color.a:((mode==0||mode==6||mode==13)?i.extra:0);float sp=sin(pitch),cp=cos(pitch);p=float3(p.x,p.y*cp-p.z*sp,p.y*sp+p.z*cp);float s=sin(i.yaw),c=cos(i.yaw);p=i.origin+float3(p.x*c+p.z*s,p.y,-p.x*s+p.z*c);float3 n=i.n/max(i.scale,.0001);n=float3(n.x,n.y*cp-n.z*sp,n.y*sp+n.z*cp);o.normal=normalize(float3(n.x*c+n.z*s,n.y,-n.x*s+n.z*c));}
- o.world=p;o.uv=i.uv;o.color=i.color;
+ o.world=p;o.uv=i.uv;o.color=i.color;o.extra=i.extra;
  if(mode==15||mode==18){if(mode==18)o.color.a=1;float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+i.uv)/float2(16,8);}
  if(mode==14){o.world=float3(i.p.x*i.scale.x,1.8-i.origin.y,i.p.y*i.scale.y);o.uv=float2(i.scale.x*.5,i.scale.z);}
  if(mode==11){o.p=float4(i.p.xy*2,1,1);o.world=normalize(cross(camRight.xyz,camUp.xyz)+camRight.xyz*i.p.x*2*params.z/params.w*eye.w+camUp.xyz*i.p.y*2*eye.w);}
- else if(mode==4||mode==5||mode==16){o.p=float4(p.x/params.z*2-1,1-p.y/params.w*2,0,1);if(mode==16)o.uv=float2(i.uv.x,1-i.uv.y);if(mode==4){float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+float2(i.uv.x,1-i.uv.y))/float2(16,8);}}
+ else if(mode==4||mode==5||mode==16||mode==19||mode==20||mode==21){o.p=float4(p.x/params.z*2-1,1-p.y/params.w*2,0,1);if(mode==16||mode==19||mode==20||mode==21)o.uv=float2(i.uv.x,1-i.uv.y);if(mode==4){float ch=i.extra-32;o.uv=(float2(fmod(ch,16),floor(ch/16))+float2(i.uv.x,1-i.uv.y))/float2(16,8);}}
  else o.p=mul(float4(p,1),vp);
  return o;
 }
 float4 psMain(VSOut i):SV_TARGET{
  float mode=params.x;float4 c=i.color;
+ if(mode==22){float4 t=tex.Sample(samp,i.uv);clip(t.a-.2);return float4(pow(max(t.rgb*c.rgb,0),1/2.2),1);}
+ if(mode==19||mode==20){
+  float radius=c.r*3*params.w/900;
+  float2 stepUV=mode==19?float2(radius/params.z,0):float2(0,radius/params.w);
+  float3 blurred=tex.Sample(samp,i.uv).rgb*.227027;
+  const float weights[4]={.1945946,.1216216,.054054,.016216};
+  [unroll] for(int n=1;n<=4;++n)blurred+=(tex.Sample(samp,i.uv+stepUV*n).rgb+tex.Sample(samp,i.uv-stepUV*n).rgb)*weights[n-1];
+  if(mode==20){float2 p=i.uv*2-1;blurred*=1-c.r*.10*dot(p,p);}
+  return float4(blurred,1);
+ }
+ if(mode==21){float2 p=i.uv*2-1;float opening=(1-c.a)*1.2-.04;float edge=abs(p.y)+.18*p.x*p.x*(1-c.a)-opening;return float4(.002,.003,.005,smoothstep(-.025,.025,edge));}
  if(mode==17){float border=(i.uv.x<.008||i.uv.x>.992||i.uv.y<.12||i.uv.y>.88)?1:0;float3 fill=i.uv.x<=c.a?c.rgb:float3(.035,.045,.055);return float4(lerp(fill,float3(.65,.7,.72),border),1);}
  if(mode==16)return c*tex.Sample(samp,i.uv);
  if(mode==4){c.a*=tex.Sample(samp,i.uv).a;return c;}
@@ -143,9 +159,18 @@ float4 psMain(VSOut i):SV_TARGET{
  if(mode==8||mode==9){float d=length(i.uv*2-1);clip(1-d);float a=pow(saturate(1-d),mode==8?1.5:1.1);return float4(c.rgb,c.a*a);}
  if(mode==10){float d=length(i.uv*2-1);float rim=1-smoothstep(.006,.018,abs(d-.97));clip(rim-.01);return float4(c.rgb,c.a*rim);}
  if(mode==12){float d=length(i.uv*2-1);clip(1-d);return float4(c.rgb,c.a*pow(saturate(1-d),1.6));}
+ if(mode==23||mode==24){
+  float2 p=(i.uv*2-1)*float2(1,i.extra);
+  float d=length(float2(p.x,max(abs(p.y)-(i.extra-1),0)));
+  float aa=max(fwidth(d),.03);float mask=1-smoothstep(.65-aa,1+aa,d);
+  float fog=exp(-length(i.world-eye.xyz)*camUp.w);clip(mask-.002);
+  float join=i.extra>1.01?.5+.5*saturate(i.extra-1-abs(p.y)):1;
+  float opacity=mode==23?1-pow(max(1-c.a*mask,0),join):c.a*mask*join;
+  return float4(c.rgb,opacity*fog);
+ }
  if(mode==1){float4 t=tex.Sample(samp,i.uv);clip(t.a-.32);c*=t;c.a=1;}
  else if(mode==2){float edge=1-abs(i.uv.x*2-1);c.rgb*=pow(saturate(edge),1.2)*2;c.a*=edge;return c;}
- else if(mode==3){float d=length(i.world.xz);clip(camRight.w-d);}
+ else if(mode==3){float d=length(i.world.xz);clip(camRight.w-d);float3 detail=sqrt(max(tex.Sample(groundSamp,i.world.xz/10).rgb,0));float3 broad=sqrt(max(tex.Sample(groundSamp,i.world.xz/47).rgb,0));c.rgb*=.65+1.3*(detail*.8+broad*.2);}
  else c*=tex.Sample(samp,i.uv);
  if(mode!=1){float light=.48+max(dot(normalize(i.normal),normalize(float3(-.5,.9,-.35))),0)*.85;c.rgb*=light;}
  float fog=1-exp(-length(i.world-eye.xyz)*camUp.w);c.rgb=lerp(c.rgb,float3(.026,.061,.077),fog);
@@ -164,11 +189,11 @@ public:
   Com<ID3D11PixelShader> ps;
   Com<ID3D11InputLayout> layout;
   Com<ID3D11Buffer> constants, instances;
-  Com<ID3D11SamplerState> sampler;
+  Com<ID3D11SamplerState> sampler, groundSampler;
   Com<ID3D11RasterizerState> raster;
   Com<ID3D11DepthStencilState> depthWrite, depthRead, depthOff;
   Com<ID3D11BlendState> opaque, additive, alpha;
-  Com<ID3D11ShaderResourceView> beast, metal, white, font;
+  Com<ID3D11ShaderResourceView> beast, metal, white, font, terrain;
   Com<IWICImagingFactory> wic;
   Mesh quad, cube, cylinder, tube, rock, ground;
   std::array<QuerySet, 12> queries;
@@ -262,6 +287,8 @@ public:
     sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
     sd.MaxLOD = D3D11_FLOAT32_MAX;
     check(device->CreateSamplerState(&sd, sampler.put()), "Sampler");
+    sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    check(device->CreateSamplerState(&sd, groundSampler.put()), "Ground sampler");
     D3D11_RASTERIZER_DESC rd{};
     rd.FillMode = D3D11_FILL_SOLID;
     rd.CullMode = D3D11_CULL_NONE;
@@ -295,6 +322,7 @@ public:
           "WIC factory");
     loadTexture(assets / L"alien-beast.png", beast);
     loadTexture(assets / L"turret-metal.png", metal);
+    loadTexture(assets / L"ground-basalt.png", terrain);
     uint32_t pixel = 0xffffffff;
     texture(1, 1, &pixel, white, false);
     makeFont();
@@ -554,6 +582,8 @@ public:
     context->PSSetConstantBuffers(0, 1, &cb);
     ID3D11SamplerState* ss = sampler;
     context->PSSetSamplers(0, 1, &ss);
+    ID3D11SamplerState* gs = groundSampler;
+    context->PSSetSamplers(1, 1, &gs);
     data.vp = camera.matrix(float(width) / height);
     std::memcpy(data.right, &camera.right, 12);
     std::memcpy(data.up, &camera.up, 12);
@@ -589,15 +619,16 @@ public:
     UINT strides[] = {sizeof(Vertex), sizeof(Instance)},
          offsets[] = {0, instanceOffset * UINT(sizeof(Instance))};
     context->IASetVertexBuffers(0, 2, bufs, strides, offsets);
+    if (mode == 3) textureView = terrain;
     context->PSSetShaderResources(0, 1, &textureView);
     instanceOffset += UINT(count);
-    bool overlay = mode == 4 || mode == 5 || mode == 11 || mode == 16,
+    bool overlay = mode == 4 || mode == 5 || mode == 11 || mode == 16 || mode == 19 || mode == 20 || mode == 21,
          soft = mode == 2 || mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
-                mode == 14 || mode == 15 || mode == 18;
+                mode == 14 || mode == 15 || mode == 18 || mode == 23 || mode == 24;
     context->OMSetDepthStencilState(overlay ? depthOff : soft ? depthRead : depthWrite, 0);
-    bool add = mode == 2 || mode == 7 || mode == 8;
+    bool add = mode == 2 || mode == 7 || mode == 8 || mode == 24;
     bool blend =
-        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18;
+        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18 || mode == 21 || mode == 23;
     context->OMSetBlendState(add ? additive : blend ? alpha : opaque, nullptr, 0xffffffff);
     context->DrawInstanced(mesh.count, UINT(count), 0, 0);
     ++drawCalls;

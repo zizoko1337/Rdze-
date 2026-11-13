@@ -9,6 +9,9 @@
 #include "jukebox_scene.hpp"
 #include "upgrade_lab.hpp"
 #include "bestiary.hpp"
+#include "coffee_scene.hpp"
+#include "coffee_effects.hpp"
+#include "coffee_visual_test.hpp"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -29,6 +32,7 @@ inline int run(int argc, char** argv) {
   bool revisionTest = false;
   bool legendsTest = false;
   bool bossTest = false;
+  bool coffeeTest = false;
   for (int i = 1; i < argc; ++i) {
     test |= std::string(argv[i]) == "--command-test";
     testMini |= std::string(argv[i]) == "--minigun";
@@ -50,6 +54,7 @@ inline int run(int argc, char** argv) {
     revisionTest |= std::string(argv[i]) == "--revision-test";
     legendsTest |= std::string(argv[i]) == "--legends-test";
     bossTest |= std::string(argv[i]) == "--boss-test";
+    coffeeTest |= std::string(argv[i]) == "--coffee-test";
   }
   plasmaTest |= coolingTest;
   revisionTest |= legendsTest;
@@ -58,10 +63,10 @@ inline int run(int argc, char** argv) {
   deliveryTest |= upgradeTest;
   progressionTest |= deliveryTest;
   test |= progressionTest || frontierTest || servicesTest || manualTest || radioTest ||
-          plasmaTest || enemyTest || coreTest || bossTest;
+          plasmaTest || enemyTest || coreTest || bossTest || coffeeTest;
   progressionLab |= frontierLab;
   const bool liveExpedition = !test || progressionTest || frontierTest || servicesTest ||
-                              radioTest || plasmaTest || enemyTest || coreTest;
+                              radioTest || plasmaTest || enemyTest || coreTest || coffeeTest;
   try {
     check(CoInitializeEx(nullptr, COINIT_MULTITHREADED), "COM initialization");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
@@ -74,7 +79,8 @@ inline int run(int argc, char** argv) {
     } runtime;
     auto root = std::filesystem::current_path(), assets = root / "public" / "assets";
     auto artifacts = root / "artifacts" / "command" /
-                     (bossTest       ? "bosses"
+                     (coffeeTest     ? "coffee"
+                      : bossTest     ? "bosses"
                       : legendsTest ? "manual-legends"
                       : revisionTest ? "manual-revision"
                       : coreTest     ? "core"
@@ -109,6 +115,9 @@ inline int run(int argc, char** argv) {
     FrontierScene frontierScene(renderer, assets);
     SniperMonitor sniperMonitor;
     JukeboxScene jukebox;
+    CoffeeScene coffeeScene(renderer, assets);
+    CoffeeEffects coffeeEffects;
+    CoffeeVisualTest coffeeVisual;
     UpgradeLab upgradeLab;
     Bestiary bestiary;
     bool bestiaryPausePass = false, bestiarySpawnPass = false, enemyResumePass = false;
@@ -268,6 +277,9 @@ inline int run(int argc, char** argv) {
         session->world.announce(
             "POLIGON EKSPEDYCJI: boss za 30 s. Fabryka i radar czekają przy komputerze.");
       }
+      for (auto& offer : session->expedition.rewards)
+        for (int c = 0; c < 3; ++c)
+          offer.rarities[c] = session->expedition.effectiveRarity(offer.choices[c], offer.rarities[c]);
       audio.reset();
       music.reset();
       accumulator = 0;
@@ -301,6 +313,8 @@ inline int run(int argc, char** argv) {
       }
     };
     auto toggleTactical = [&]() {
+      if (session->coffee.active)
+        return;
       if (session->serviceTarget != Service::None) {
         session->cancelService();
         release();
@@ -354,6 +368,8 @@ inline int run(int argc, char** argv) {
       double dt = std::min(.1, std::chrono::duration<double>(now - last).count());
       last = now;
       double wall = std::chrono::duration<double>(now - begin).count();
+      if (coffeeTest)
+        coffeeVisual.step(*session, wall, key, launch, window.get(), capture, running);
       if (bossTest) {
         constexpr Species kinds[] = {Wyrm, Slime, Devourer, SiegeBoss};
         if (stage == 0 && wall > .3) {
@@ -872,7 +888,7 @@ inline int run(int argc, char** argv) {
           running = false;
       }
       if (test && !progressionTest && !frontierTest && !servicesTest && !manualTest && !radioTest &&
-          !plasmaTest && !enemyTest && !coreTest && !bossTest) {
+          !plasmaTest && !enemyTest && !coreTest && !bossTest && !coffeeTest) {
         if (stage == 9 && wall - stageAt > .15 && !roofShot) {
           capture = "06-round-roof.png";
           roofShot = true;
@@ -1170,7 +1186,7 @@ inline int run(int argc, char** argv) {
           stage = 8;
           stageAt = wall;
         } else if (stage == 8 && !session->terminalOpen && wall - stageAt > .15) {
-          factoryPass &= session->expedition.roverBatch == 5;
+          factoryPass &= session->expedition.roverBatch == 9;
           capture = "frontier-02-rover.png";
           for (int id : session->world.active)
             if (session->world.foes[id].type == Titan)
@@ -1180,7 +1196,7 @@ inline int run(int argc, char** argv) {
             foe.x = 0;
             foe.z = 90;
             foe.speed = 0;
-            foe.hp = 150;
+            foe.hp = foe.maxHp; // Keep the boss alive while the stronger rover batch reaches it.
             session->world.grid.rebuild(session->world.foes, session->world.active);
           }
           session->player = {0, CORE_HEIGHT + 1.72f, -4};
@@ -1199,6 +1215,9 @@ inline int run(int argc, char** argv) {
           stage = 10;
           stageAt = wall;
         } else if (stage == 10 && wall - stageAt > .35) {
+          // Only the scripted manual shot needs a one-hit fixture; do not expose it during the lift.
+          if (fixture >= 0 && session->world.foes[fixture].hp > 0)
+            session->world.foes[fixture].hp = 150;
           SDL_Event e{};
           e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
           e.button.which = testDevice;
@@ -1254,8 +1273,11 @@ inline int run(int argc, char** argv) {
         } else if (stage == 17 && session->frontier.collected == 1) {
           bossRarityPass = session->expedition.rewards.size() == 1 &&
                            session->expedition.rewards.front().source == RewardSource::BossCrystal;
-          for (auto r : session->expedition.rewards.front().rarities)
-            bossRarityPass &= r >= Rarity::Rare;
+          for (int c = 0; c < 3; ++c) {
+            const auto& reward = session->expedition.rewards.front();
+            bool combat = isTower(reward.choices[c]) && !isSupport(towerWeapon(reward.choices[c]));
+            bossRarityPass &= combat || reward.rarities[c] >= Rarity::Rare;
+          }
           key(SDL_SCANCODE_TAB);
           key(SDL_SCANCODE_E);
           stage = 18;
@@ -1347,10 +1369,18 @@ inline int run(int argc, char** argv) {
           else
             session->expedition.rewards.front().choices = {Upgrade::Damage, Upgrade::Hull,
                                                            Upgrade::Mining};
+          for (int c = 0; c < 3; ++c) {
+            auto& offer = session->expedition.rewards.front();
+            offer.rarities[c] = session->expedition.effectiveRarity(offer.choices[c], offer.rarities[c]);
+          }
           capture = "expedition-03-reward.png";
           stage = 8;
           stageAt = wall;
         } else if (stage == 8 && wall - stageAt > .2) {
+          for (int c = 0; c < 3; ++c) {
+            auto& offer = session->expedition.rewards.front();
+            offer.rarities[c] = session->expedition.effectiveRarity(offer.choices[c], offer.rarities[c]);
+          }
           expectedChoice = session->expedition.rewards.front().choices[0];
           click(ui.rewardCard(0));
           stage = 9;
@@ -1492,6 +1522,10 @@ inline int run(int argc, char** argv) {
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
           auto code = event.key.scancode;
           held[code] = true;
+          if (session->coffee.active &&
+              (code == SDL_SCANCODE_TAB || code == SDL_SCANCODE_E || code == SDL_SCANCODE_C ||
+               code == SDL_SCANCODE_APOSTROPHE || code == SDL_SCANCODE_SEMICOLON))
+            continue;
           if (code == SDL_SCANCODE_APOSTROPHE && session->mode != Mode::Selection) {
             session->bestiaryOpen = !session->bestiaryOpen;
             session->upgradeLabOpen = false;
@@ -1665,6 +1699,8 @@ inline int run(int argc, char** argv) {
             session->tactical && !session->upgradeLabOpen && !session->bestiaryOpen)
           toggleTactical();
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+          if (session->coffee.active && !session->world.paused)
+            continue;
           if (session->bestiaryOpen) {
             bestiary.click(ui, *session, event.button.x, event.button.y);
             continue;
@@ -1777,13 +1813,14 @@ inline int run(int argc, char** argv) {
         release();
         deathHandled = true;
       }
-      audio.update(session->world);
+      audio.update(session->world, session->manualAudioState(!help && !minimized));
       music.sync(session->radio,
                  session->expedition.enabled && session->expedition.miningStarted &&
                      session->buttonAge >= 3.45f && !session->expedition.dead(),
                  session->world.paused, audio.enabled);
       auto radioStatus = music.snapshot();
       camera.farClip = 5000;
+      camera.roll = 0;
       if (session->tactical && !session->expedition.dead()) {
         tacticalView.camera(camera, float(renderer.width) / renderer.height);
       } else if (session->mode == Mode::Selection) {
@@ -1862,6 +1899,10 @@ inline int run(int argc, char** argv) {
         camera.target = {foe.x, 6, foe.z + (foe.type == Wyrm ? 18.f : 0.f)};
       }
       Vec3 shake = session->criticalShake();
+      if (session->mode == Mode::Mounted && !session->tactical && capture.empty() && !help &&
+          !session->expedition.dead()) {
+        applyManualCamera(camera, session->feedback.pose);
+      }
       camera.eye = camera.eye + shake;
       camera.target = camera.target + shake;
       ui.radarHeading = std::atan2(camera.target.x - camera.eye.x, camera.target.z - camera.eye.z);
@@ -1881,11 +1922,19 @@ inline int run(int argc, char** argv) {
       buildSlotOverlay(scene, *session, hoveredSlot);
       frontierScene.append(scene, *session, hoveredCrystal);
       jukebox.append(scene, *session, radioStatus, float(dt));
+      coffeeScene.append(scene, *session);
       appendServiceEffects(scene, *session, {tacticalView.placeX, 0, tacticalView.placeZ},
                            hoveredSlot);
       scene.render(renderer);
       sniperMonitor.draw(renderer, *session);
       jukebox.draw(renderer);
+      coffeeScene.draw(renderer);
+      bool sleepyView = session->expedition.enabled && session->mode != Mode::Selection &&
+                        !session->blocked() && !session->coffee.active && !help;
+      if (coffeeTest && capture == "coffee-00-sleepy.png")
+        renderer.screenshot(artifacts / "coffee-00-sharp-reference.png");
+      if (sleepyView)
+        coffeeEffects.blur(renderer, session->coffee.fatigue());
       if (session->bestiaryOpen)
         bestiary.draw(ui, renderer, scene, *session);
       else if (session->upgradeLabOpen)
@@ -1895,6 +1944,8 @@ inline int run(int argc, char** argv) {
       else
         ui.drawCommand(renderer, *session, fps, SDL_GetWindowRelativeMouseMode(window.get()), help,
                        audio.enabled, hoveredSlot, hoveredCrystal);
+      if (sleepyView)
+        coffeeEffects.eyelids(renderer, session->coffee.blink());
       renderer.end();
       if (!capture.empty()) {
         renderer.screenshot(artifacts / capture);
@@ -1911,6 +1962,17 @@ inline int run(int argc, char** argv) {
       }
     }
     release();
+    if (coffeeTest) {
+      bool pass = coffeeVisual.complete;
+      std::ofstream report(artifacts / "coffee-result.json");
+      report << "{\n  \"pass\": " << (pass ? "true" : "false")
+             << ",\n  \"completed_tiers\": " << coffeeVisual.cycle
+             << ",\n  \"pause_verified\": " << (coffeeVisual.paused ? "true" : "false")
+             << ",\n  \"input_lock_verified\": " << (coffeeVisual.lockChecked ? "true" : "false")
+             << ",\n  \"stage\": " << coffeeVisual.stage << "\n}\n";
+      std::cout << (pass ? "PASS" : "FAIL") << " COFFEE APPLICATION TEST\n";
+      return pass ? 0 : 1;
+    }
     if (coreTest) {
       bool pass = stage == 17 && coreRegenPass && coreLabPass && corePausePass && corePauseMenuPass;
       std::ofstream out(artifacts / "core-result.json");

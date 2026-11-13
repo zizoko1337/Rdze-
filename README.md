@@ -32,7 +32,7 @@ Rdzeń zaczyna z **1500 HP**, wydobywa **2 jednostki uranu/s**, a pasek mieści 
 
 Po wypłatę podejdź do **lewego komputera** na platformie. Popatrz na niego z bliska i naciśnij **E**. Zielona lampka miga, jeśli są dostępne nagrody, a mały ekran pokazuje ich liczbę. Wybierz kartę **1/2/3** lub kliknięciem. Karta jest natychmiast instalowana, a terminal się zamyka. **E/Esc** pozwala wyjść bez wybierania; propozycje pozostają takie same. Wypłaty mogą czekać w kolejce. Otwarcie terminala zatrzymuje walkę, wydobycie i lot transportowca. **Prawy komputer służy osobno do jednorazowych usług.**
 
-Jest **38 rodzajów kart** i pięć rzadkości: **Common, Uncommon, Rare, Epic, Legendary**. Kolor i nazwa rzadkości są widoczne na karcie, a opis podaje faktyczną wielkość bonusu. Zamknięcie komputera nie zmienia propozycji ani ich rzadkości. Pierwsza wypłata zawsze zawiera przynajmniej jedną propozycję nowej wieżyczki bojowej.
+Jest **71 rodzajów kart** i pięć rzadkości: **Common, Uncommon, Rare, Epic, Legendary**. Kolor i nazwa rzadkości są widoczne na karcie, a opis podaje faktyczną wielkość bonusu. Zamknięcie komputera nie zmienia propozycji ani ich rzadkości. Pierwsza wypłata zawsze zawiera przynajmniej jedną propozycję nowej wieżyczki bojowej.
 
 Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy wsparcia**. Liczba egzemplarzy wybranego typu może rosnąć aż do wspólnego limitu 210 stanowisk. Po wybraniu czterech typów bojowych pozostałe typy bojowe znikają z losowania; wsparcie ma osobny limit dwóch typów.
 
@@ -50,7 +50,7 @@ Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy ws
 | Impulsy kriogeniczne | Spowolnienie narasta wraz ze zbliżaniem się bestii do rdzenia, w promieniu 85 m |
 | Wspólny cel | Manualne trafienie oznacza cel na 3 s; wieżyczki w zasięgu przełączają na niego ostrzał. Cel otrzymuje +0/10/20/30/40% obrażeń zależnie od rzadkości |
 | Awaryjne oczyszczenie | Raz na ekspedycję, przy 50% HP: zabija zwykłe bestie i zadaje bossom 50% ich maksymalnego HP |
-| Fabryka jeździków | Uruchamia produkcję jednej maszyny co 12 s; jeździk szuka najbliższego celu i zadaje mu 100 obrażeń przy kontakcie, bez obrażeń obszarowych |
+| Fabryka jeździków | Uruchamia produkcję 5 maszyn co 12 s; jeździk szuka najbliższego celu i wybucha w promieniu 4 m, za 180 obrażeń w centrum (mniej bossom) |
 | Punkt usług (tylko Rare) | +1 punkt do wydania przy prawym komputerze na jedną z trzech jednorazowych usług |
 | Większa seria / szybsza linia | +1/2/3/4/5 jeździków na serię albo +10/20/30/40/50% bazowego tempa produkcji, zgodnie z rzadkością karty |
 
@@ -80,7 +80,7 @@ Zwykły minigun ma stopniowo czerwieniejące końcówki luf. Jego przemiana **Le
 
 Laser i minigun są podstawowymi działami startowymi; pozostałe odblokowania dojdą później. Laser otrzymał jednorazową przemianę **Legendary: Laserowy moździerz** (eksperymentalna technologia plazmowa). Głowica ma 17 widocznych emiterów i strzela łukiem salwami o łącznej sile 20 zwykłych impulsów lasera, rozłożonymi w promieniu 10 m. Bazowo daje 3000 nominalnych obrażeń na salwę przy niezmienionej szybkostrzelności.
 
-**; otwiera laboratorium wszystkich 38 ulepszeń**: wyszukiwanie, wybór rzadkości i dodawanie do bieżącego podejścia bez zużywania nagród. Enter dodaje kartę, Tab zmienia rzadkość, strzałki/kółko przewijają, ; lub Esc zamyka panel. [Zasady plazmy i laboratorium](PLAZMA_LAB.md).
+**; otwiera laboratorium wszystkich 71 ulepszeń**: wyszukiwanie, wybór rzadkości i dodawanie do bieżącego podejścia bez zużywania nagród. Enter dodaje kartę, Tab zmienia rzadkość, strzałki/kółko przewijają, ; lub Esc zamyka panel. [Zasady plazmy i laboratorium](PLAZMA_LAB.md).
 
 **' (apostrof) otwiera bestiariusz** z grafikami, statystykami i przywoływaniem po 1, 10 lub 100 przeciwników. Czas stoi podczas wyboru. Nowe bestie: elita sabotażysta niszczący wieżyczkę po 3 s, oblężniczy plujec strzelający z 63 m i boss Nadumysł wyłączający wieżyczki impulsami na obszarze dwóch heksów. [Mechanika, testy i grafiki](BESTIARIUSZ.md).
 
@@ -92,7 +92,7 @@ Laser i minigun są podstawowymi działami startowymi; pozostałe odblokowania d
 | Toksyczna katapulta | Co 2,8 s, 360 m | Lot łukiem; plama o promieniu 14 m utrzymuje się 8 s i zadaje 65 DPS, spowalniając o 50%. |
 | Moździerz boczny | 1100 obrażeń, co 3,5 s, 460 m | Lufa po prawej; pocisk leci łukiem i po dolocie wybucha w promieniu 15 m. Podgląd trajektorii i czasu dolotu. |
 | Rakiety / Smart | 180 obrażeń, co 0,32 s, 500 m | Namierzają przez 0,5 s cel najbliżej środka okienka, potem lecą po zakrzywionej trasie i wybuchają w promieniu 9 m. Bez celu nie strzelają. |
-| Lanca próżniowa | 640 DPS + 200 przy pierwszym kontakcie, 550 m | Przytrzymaj LPM: ładowanie 1,8 s, wiązka przez 3 s, chłodzenie 2 s. Puszczenie przerywa ładowanie lub ostrzał. |
+| Lanca próżniowa | 1650 DPS + 200 przy pierwszym kontakcie, 550 m | Przytrzymaj LPM: ładowanie 1,8 s, wiązka przez 3 s, chłodzenie 2 s. Puszczenie przerywa ładowanie lub ostrzał. |
 | Snajper / Railgun | 750 bazowych obrażeń × (1 + dystans w m / 100), co 2,4 s, 750 m | Przebija do ośmiu przeciwników; każdy otrzymuje własny bonus dystansu. Ekran na broni pokazuje rzeczywisty widok z celownika w zbliżeniu około 8,3×. |
 | Miotacz / Piekło | 240 DPS; PPM: 63 m szeroko / 94,5 m wąsko (5 m) | Stożek o kącie około 57°, zasięg trzech odstępów heksów; podpalenie 30 DPS przez 3 s. Podświetlenie ziemi pokazuje obszar działania, jego krawędzie i odstępy co 21 m. |
 
@@ -104,14 +104,15 @@ Broń jest oddzielnym modułem od fotela i windy. Parametry z tabeli są wartoś
 
 - Platforma rdzenia na wysokości 18 m: centralny fotel, teleskopowa winda, konsole i kolumny. Okrągły dach ma kształt niskiego ściętego stożka z rozsuwanym okrągłym włazem. Opada ku brzegom, odsłaniając więcej terenu podczas celowania z podniesionego stanowiska. Barierki biegną po zewnętrznej krawędzi pokładu; można podejść do nich bliżej.
 - Można chodzić i rozglądać się po pokładzie. Kolizje chronią przed wejściem w stanowisko, kolumny i konsole oraz spadnięciem z krawędzi.
-- Na początku 15 podstawowych bestii. Po 60 s dochodzą szybcy łowcy, po 120 s tarany, po 180 s plujące bestie, po 240 s latające widma. Każdy gatunek ma oddzielny sprite i inne parametry. Elity pojawiają się od 90 s, są większe, mają złote oznaczenie i czterokrotne HP.
+- Po uruchomieniu wydobycia nie ma natychmiastowej grupy przy bazie. Przeciwnicy zaczynają nadchodzić pojedynczo z obrzeży, w odległości 280–320 m od rdzenia; pierwszy pojawia się po około 0,5 s, następni początkowo co około 2,8 s. Po 60 s dochodzą szybcy łowcy, po 120 s tarany, po 180 s plujące bestie, po 240 s latające widma. Każdy gatunek ma oddzielny sprite i inne parametry. Elity pojawiają się od 90 s, są większe, mają złote oznaczenie i czterokrotne HP.
 - Co 3 minuty nadchodzi boss: naprzemiennie Tytan Bazaltu oraz Królowa Roju. Alarm pojawia się 10 s wcześniej. Tytan emituje uderzenia blisko rdzenia, Królowa przywołuje łowców. Pokonanie bossa daje 15 s zmniejszonego naporu.
-- Z bossa zawsze wypada kryształ; z elity jest 1% szansy. W widoku z góry kliknij kryształ, aby wysłać drona. **C** wysyła drona po najbliższy wolny kryształ. Można kolejkować kolejne zlecenia. Nagroda trafia do komputera dopiero po powrocie; kryształ bossa daje trzy propozycje minimum Rare, z większą szansą Epic i Legendary. Uran nadal daje wypłatę natychmiast po zapełnieniu paska.
+- Z bossa zawsze wypada kryształ; z elity jest 1% szansy. W widoku z góry kliknij kryształ, aby wysłać drona. **C** wysyła drona po najbliższy wolny kryształ. Można kolejkować kolejne zlecenia. Nagroda trafia do komputera dopiero po powrocie; kryształ bossa daje propozycje ulepszeń minimum Rare, z większą szansą Epic i Legendary; karta budowy zachowuje stałą rzadkość swojego typu. Uran nadal daje wypłatę natychmiast po zapełnieniu paska.
 - Standardowy napór ma limit 6000 aktywnych przeciwników; wspólna symulacja obsługuje do 20 000, uwzględniając przywołania. Limit jeździków wynosi 2048. Obrona i produkcja pochodzą z kart, bez sklepu.
 - Podstawowe bestie mają stale 100 HP, ale ich paski zdrowia pozostają ukryte. Brak zapisu stanu i rozwoju między podejściami.
-- Podłoże ma tymczasowo jednolity, matowy kolor bez tekstury i proceduralnych wzorów.
+- Podłoże ma subtelną teksturę bazaltowego pyłu z mipmapami i filtrowaniem anizotropowym. Broń manualna zostawia krótkie osmalenia; lanca rysuje wygasającą rozżarzoną smugę. [Efekty podłoża](EFEKTY_PODLOZA.md).
+- Broń manualna ma delikatne przechyły kamery, drgania i dodatkowe mechaniczne dźwięki. Lanca pulsuje podczas wiązki, zakłóca dźwięk na rezerwie uranowej i lekko znosi lufę, co można korygować myszą. [Szczegóły efektów](MANUALNE_ZMIANY.md).
 
-Jeździki używają nowego przezroczystego sprite’a widzianego od tyłu. Wybierają najbliższego przeciwnika przy wyjeździe, omijają cylinder rdzenia, a po utracie celu namierzają nowego. Eksplozja zadaje obrażenia wyłącznie wybranemu celowi. Karty produkcji pojawiają się dopiero po zdobyciu fabryki. [Opis pełnego etapu](ETAP_03.md).
+Jeździki używają przezroczystego sprite’a widzianego od tyłu. Wybierają najbliższego przeciwnika przy wyjeździe, omijają cylinder rdzenia, a po utracie celu namierzają nowego. Eksplozja zadaje obrażenia także bardzo bliskim przeciwnikom. Karty produkcji pojawiają się dopiero po zdobyciu fabryki. [Aktualny balans wieżyczek i fabryki](BALANS_WIEZYCZEK.md).
 
 ## Sterowanie
 
@@ -163,11 +164,11 @@ Pierwszy etap: `native/expedition.hpp` — wydobycie, transporty i kolejka kart;
 
 **TEST_OBRAZU.bat** sprawdza renderowanie podczas ciągłego strzelania i obrotów kamery, również przy przełączaniu pełnego ekranu. Raporty: `artifacts/render/`. [Opis poprawki migotania i zakres sprawdzeń](POPRAWKA_OBRAZU.md).
 
-**TEST_ROZWOJU.bat** sprawdza nowy terminal z rzadkościami, wybór Tesli, pauzę rozmieszczania, dostawę właściwego typu i ostrzał oraz radar. Raporty i zrzuty: `artifacts/command/upgrades/`. `progression-tests.exe`, uruchamiany przy przebudowie, sprawdza losowanie 38 kart, szczęście, 210 mieszanych dostaw, rzeczywiste bonusy wszystkich broni i moduły rdzenia.
+**TEST_ROZWOJU.bat** sprawdza nowy terminal z rzadkościami, wybór Tesli, pauzę rozmieszczania, dostawę właściwego typu i ostrzał oraz radar. Raporty i zrzuty: `artifacts/command/upgrades/`. `progression-tests.exe`, uruchamiany przy przebudowie, sprawdza losowanie 71 kart, szczęście, 210 mieszanych dostaw, rzeczywiste bonusy wszystkich broni i moduły rdzenia.
 
 **TEST_WSPARCIA.bat** sprawdza wybór i dostawę przekaźnika, 6 połączeń, puls śnieżycy oraz podwieszony telewizor. Raporty i zrzuty: `artifacts/command/supports/`. `support-tests.exe` sprawdza limity 4+2, sąsiedztwo heksów, rzeczywiste tempo i zasięg, łączenie spowolnień, usuwanie instalacji oraz uruchomienie wsparcia dopiero po lądowaniu.
 
-**TEST_EKSPEDYCJI_02.bat** sprawdza przez klawiaturę i mysz odblokowanie fabryki, ulepszenie serii, strzał do bossa, kliknięcie kryształu, pauzę lotu drona i odbiór nagrody minimum Rare. Raporty: `artifacts/command/frontier/`. `frontier-tests.exe` dodatkowo sprawdza jednostkowe obrażenia bez obszaru, bezpieczne namierzanie, omijanie rdzenia, 2048 jeździków, losowanie kryształów i harmonogram przeciwników.
+**TEST_EKSPEDYCJI_02.bat** sprawdza przez klawiaturę i mysz odblokowanie fabryki, ulepszenie serii, strzał do bossa, kliknięcie kryształu, pauzę lotu drona i odbiór nagrody bossa. Raporty: `artifacts/command/frontier/`. `frontier-tests.exe` dodatkowo sprawdza małe wybuchy obszarowe, bezpieczne namierzanie, omijanie rdzenia, 2048 jeździków, losowanie kryształów i harmonogram przeciwników.
 
 **TEST_BALANSU.bat** uruchamia szybką symulację około 15 minut ekspedycji z prawdziwymi nagrodami, falami i walką. Automat celuje dokładnie i natychmiast obsługuje komputer, więc jest to kontrola tempa, a nie gwarancja poziomu trudności dla człowieka. Raport JSON i CSV: `artifacts/frontier/`.
 
@@ -175,10 +176,20 @@ Rdzeń regeneruje **3 HP/s**. Powtarzalne **Nanoboty regenerujące** zwiększaj�
 
 Legendarny moduł lancy **REZERWA URANOWA** przedłuża ostrzał po 3 sekundach kosztem 5 uranu/s; wiązka i dodatkowy przewód stają się zielone. [Aktualne zmiany dział manualnych](MANUALNE_ZMIANY.md).
 
-Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry przed rzutem, a przewód rezerwy lancy jest widoczny po lewej stronie z fotela. Zatrucie dodaje 20 HP/s bestiom i 100 HP/s bossom; bossowie mają paski HP. Lampy bazy są zielone powyżej 50%, żółte przy 20–50%, czerwone przy 20% lub mniej; poniżej 20% kamera operatora lekko drży.
+Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry przed rzutem, a przewód rezerwy lancy jest widoczny po lewej stronie z fotela. Zatrucie manualne dodaje 20 HP/s bestiom i 100 HP/s bossom; automatyczna toksyna ma osobne, kumulowane dawki. Bossowie mają paski HP. Lampy bazy są zielone powyżej 50%, żółte przy 20–50%, czerwone przy 20% lub mniej; poniżej 20% kamera operatora lekko drży.
 
 Wszystkie dziewięć dział ma teraz własny legendarny moduł. Tesla odblokowuje PPM ze wzmacnianiem wieżyczek, katapulta klej unieruchamiający, moździerz dwa odbicia, Smart Instant namierzanie, snajper +2% obrażeń za metr i drugi ekran CRT, miotacz dwa jednoczesne strumienie. [Pełne zasady i nazwy kart](LEGENDY_MANUALNE.md).
 
 Paczka ZIP zawiera również Uruchom-Linux.sh i LINUX.txt: uruchamianie buildu Windows przez Wine albo Steam Proton. To nie jest natywny port Linux; działanie na Linux nie zostało tutaj zweryfikowane.
 
 Czterech nowych bossów: Żmij segmentowy, Śluzowiec (łącznie 24000 HP), Pożeracz oraz Plujec alfa. Wszystkich przywołasz z bestiariusza pod apostrofem. Mechaniki i statystyki: [BOSSY.md](BOSSY.md).
+
+## Kawa i senność
+
+Po 5 minutach aktywnej ekspedycji operator staje się senny: wolniej chodzi i obraca działo, obraz rozmywa się, a mruganie zasłania ekran. Ekspres stoi po lewej stronie za fotelem. Podejdź i naciśnij **E**: nalewanie i picie trwa 3 s, w tym 0,5 s picia. Walka trwa dalej.
+
+Pięć kaw daje 5 / 6 / 7 / 8 / 10 minut czujności. Karty Common / Rare / Epic / Legendary odblokowują odpowiednio tier II / III / IV / V. Ulepszenia ekspresu Rare i Legendary skracają cykl do 2 s i 1 s oraz rozbudowują model. Powtórki i niższe poziomy nie wypadają. [Zasady, grafiki i testy](KAWA.md).
+
+Propozycja kolejnych etapów: [karty, balans pierwszych ekspedycji, osiągnięcia i planety](PLAN_ROZWOJU.md).
+
+Globalne obrażenia, tempo i zasięg mają osobne limity po 5 wyborów. Każdy typ bojowej wieżyczki ma dodatkowo trzy ścieżki rozwoju kolejno Common → Uncommon → Rare → Epic → Legendary. Karty budowy mają stałe rzadkości, a oferta ma minimum 40% szansy na bojową wieżyczkę (60% dla uranu przed 10 min). [Aktualne zasady, wartości premii i losowanie](ULEPSZENIA_WIEZYCZEK.md).

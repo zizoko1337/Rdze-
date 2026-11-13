@@ -4,6 +4,7 @@
 #include "frontier.hpp"
 #include "services.hpp"
 #include "manual_arsenal.hpp"
+#include "manual_feedback.hpp"
 #include "jukebox.hpp"
 
 namespace command {
@@ -83,6 +84,17 @@ public:
   }
   Game world{false};
   Expedition expedition;
+  CoffeeState coffee;
+  Vec3 coffeeEntryPosition{};
+  float coffeeEntryYaw = 0, coffeeEntryPitch = 0;
+  static constexpr Vec3 COFFEE_MACHINE{-6.8f, CORE_HEIGHT, 5.1f};
+  static float coffeeYaw() { return std::atan2(COFFEE_MACHINE.x, COFFEE_MACHINE.z); }
+  static Vec3 coffeePoint(Vec3 local) {
+    float a = coffeeYaw();
+    return COFFEE_MACHINE + Vec3{local.x * std::cos(a) + local.z * std::sin(a), local.y,
+                                -local.x * std::sin(a) + local.z * std::cos(a)};
+  }
+  static Vec3 coffeeStand() { return coffeePoint({0, 1.72f, -3.1f}); }
   Frontier frontier;
   ServiceSystem services;
   bool terminalOpen = false;
@@ -121,7 +133,18 @@ public:
   bool teslaSupport = false;
   static constexpr float TESLA_BUFF_DURATION = 10;
   float smartClock = 0, lanceCharge = 0, lanceRemaining = 0;
+  Vec3 lanceGroundPrevious{};
+  bool lanceGroundValid = false;
+  float lanceGroundClock = 0;
   bool lanceActive = false, lanceReserveActive = false, flameFocused = false;
+  ManualFeedback feedback;
+  ManualAudioState manualAudioState(bool listening = true) const {
+    bool active = listening && mode == Mode::Mounted && !blocked() && !tactical && !coffee.active;
+    return {module.kind, shots, lanceCharge/1.8f,
+            feedback.triggerHeld && module.kind == Gun::Crank ? std::min(1.f,spinSpeed/28) : 0,
+            feedback.triggerHeld && module.kind == Gun::Flame ? 1.f : 0,
+            active, lanceActive, lanceReserveActive};
+  }
   float flameMorph = 0;
   ToxinCycle toxinCycle() const {
     float p = shots == 0 ? 1
@@ -210,6 +233,37 @@ public:
     Vec3 delta = Vec3{START_BUTTON.x, CORE_HEIGHT + 1.7f, START_BUTTON.z - .55f} - player;
     return length(delta) < 3.2f && dot(normalize(delta), forward()) > .45f;
   }
+  bool nearCoffee() const {
+    if (!expedition.enabled || mode != Mode::Walking || tactical || coffee.active)
+      return false;
+    Vec3 delta = coffeePoint({0, 1.6f, -.4f}) - player;
+    Vec3 front = coffeePoint({0, 0, -1}) - COFFEE_MACHINE;
+    return length(delta) < 3.1f && dot(normalize(delta), forward()) > .5f &&
+           dot(player - COFFEE_MACHINE, front) > 1;
+  }
+  bool startCoffee() {
+    if (blocked() || !nearCoffee())
+      return false;
+    coffeeEntryPosition = player;
+    coffeeEntryYaw = yaw;
+    coffeeEntryPitch = pitch;
+    cancelAim();
+    return coffee.start(expedition.coffeeTier, expedition.coffeeMachineTier);
+  }
+  void updateCoffee(float dt) {
+    bool wasActive = coffee.active;
+    int cupsBefore = coffee.cups;
+    coffee.tick(dt, expedition.enabled && expedition.miningStarted);
+    if (wasActive) {
+      float t = CoffeeState::smooth(float(coffee.age) / coffee.alignEnd());
+      player = coffeeEntryPosition * (1 - t) + coffeeStand() * t;
+      yaw = coffeeEntryYaw + std::remainder(coffeeYaw() - coffeeEntryYaw, 2 * PI) * t;
+      pitch = coffeeEntryPitch * (1 - t);
+    }
+    if (coffee.cups > cupsBefore)
+      world.announce(std::string(COFFEE_NAMES[coffee.servingTier - 1]) + " / " +
+                     std::to_string(COFFEE_MINUTES[coffee.servingTier - 1]) + " min bez senności.");
+  }
   bool chooseUpgrade(int index, bool debug = false) {
     if (!terminalOpen || expedition.dead() || expedition.rewards.empty() || index < 0 || index >= 3)
       return false;
@@ -220,6 +274,12 @@ public:
       return false;
     }
     Rarity rarity = expedition.rewards.front().rarities[index];
+    if (!debugTower && !expedition.eligible(kind, rarity)) {
+      expedition.validateFront();
+      return false;
+    }
+    if (fixedRarity(kind) >= 0 && fixedRarity(kind) != int(rarity))
+      return false;
     if (requiredManualGun(kind) != Gun::Count &&
         (requiredManualGun(kind) != module.kind || rarity != Rarity::Legendary))
       return false;
@@ -256,6 +316,16 @@ public:
       world.towerRate += .15f * power;
     if (kind == Upgrade::TowerRange)
       world.towerRange += .15f * power;
+    if (isTypedTowerUpgrade(kind)) {
+      Weapon type = upgradedTower(kind);
+      float bonus = typedTowerBonus(kind, rarity);
+      if (towerStat(kind) == 0)
+        world.typeDamage[type] += bonus;
+      else if (towerStat(kind) == 1)
+        world.typeRate[type] += bonus;
+      else
+        world.typeRange[type] += bonus;
+    }
     if (kind == Upgrade::FlatDamage)
       flatDamage += 1;
     if (kind == Upgrade::Luck)
@@ -270,6 +340,10 @@ public:
       expedition.roverRate = std::min(24.f, expedition.roverRate + (int(rarity) + 1) * .1f);
     if (kind == Upgrade::ServiceCredit)
       ++expedition.servicePoints;
+    if (coffeeUpgradeTier(kind))
+      expedition.coffeeTier = coffeeUpgradeTier(kind);
+    if (machineUpgradeTier(kind))
+      expedition.coffeeMachineTier = machineUpgradeTier(kind);
     if (kind == Upgrade::PlasmaMortar)
       module.plasma = true;
     if (kind == Upgrade::ExtremeCooling)
@@ -293,6 +367,7 @@ public:
     ++expedition.levels[size_t(kind)];
     ++expedition.selected;
     expedition.rewards.pop_front();
+    expedition.validateFront();
     terminalOpen = false;
     world.announce(isTower(kind) ? "Wybierz wolny heks. LPM zamawia zrzut, Tab wraca na pokład."
                                  : std::string("Zainstalowano: ") + UPGRADES[size_t(kind)].name);
@@ -309,7 +384,9 @@ public:
       return false;
     if (kind == Upgrade::UraniumReserve && module.kind != Gun::Lance)
       return false;
-    rarity = std::max(rarity, minimumRarity(kind));
+    rarity = expedition.effectiveRarity(kind, rarity);
+    if (fixedRarity(kind) >= 0)
+      rarity = Rarity(fixedRarity(kind));
     if (kind == Upgrade::ServiceCredit)
       rarity = Rarity::Rare;
     if (kind == Upgrade::FlatDamage || kind == Upgrade::Luck)
@@ -494,8 +571,13 @@ public:
     deployInitialFoes();
   }
   void deployInitialFoes() {
+    if (expedition.enabled) {
+      // Expedition enemies arrive gradually from the frontier, never as a nearby opening pack.
+      spawnTimer = .5f;
+      return;
+    }
     for (int i = 0; i < 15; ++i) {
-      // Initial targets are visible ahead of the gun, with a few flankers.
+      // The standalone weapon-training mode retains its nearby targets.
       float a = i < 10 ? (i - 4.5f) * .105f : i * 2.39996f;
       float r = 85 + random.unit() * 75;
       int id = world.spawn(Crawler, std::sin(a) * r, std::cos(a) * r);
@@ -516,6 +598,8 @@ public:
     return true;
   }
   bool interact() {
+    if (coffee.active)
+      return false;
     if (radioOpen) {
       radioOpen = false;
       return true;
@@ -532,6 +616,8 @@ public:
       return false;
     if (tactical)
       return false;
+    if (nearCoffee())
+      return startCoffee();
     if (nearStartButton())
       return startExtraction();
     if (nearRadio()) {
@@ -568,10 +654,12 @@ public:
     return false;
   }
   void look(float dx, float dy) {
-    if (mode == Mode::Selection || blocked() || tactical)
+    if (mode == Mode::Selection || blocked() || tactical || coffee.active)
       return;
     if (seated()) {
       pendingYaw += dx;
+      if (coffee.fatigue() > 0)
+        pendingYaw = std::clamp(pendingYaw, -.45f, .45f);
       pendingPitch = std::clamp(pitch + pendingPitch + dy, -1.12f, .65f) - pitch;
     } else {
       yaw += dx;
@@ -584,8 +672,17 @@ public:
       return;
     // Render-rate exponential response: light inertia (~75 ms), no overshoot or spring wobble.
     // Camera, barrel and shot direction share the same actual orientation.
+    // Lance drift may have moved the barrel since the mouse target was queued.
+    pendingPitch = std::clamp(pitch + pendingPitch, -1.12f, .65f) - pitch;
     float response = -std::expm1(-dt / .075f);
     float dx = pendingYaw * response, dy = pendingPitch * response;
+    if (coffee.fatigue() > 0) {
+      float amount = std::hypot(dx, dy), limit = coffee.turnLimit() * dt;
+      if (amount > limit) {
+        dx *= limit / amount;
+        dy *= limit / amount;
+      }
+    }
     yaw += dx;
     pitch += dy;
     pendingYaw -= dx;
@@ -594,10 +691,10 @@ public:
     gunPitch = pitch;
   }
   void move(const Input& input, float dt) {
-    if (mode != Mode::Walking || tactical)
+    if (mode != Mode::Walking || tactical || coffee.active)
       return;
     float n = std::max(1.f, std::hypot(input.side, input.forward));
-    float d = dt * (input.fast ? 7.f : 4.5f) / n;
+    float d = dt * (input.fast ? 7.f : 4.5f) * coffee.walkingMultiplier() / n;
     player.x += (std::sin(yaw) * input.forward + std::cos(yaw) * input.side) * d;
     player.z += (std::cos(yaw) * input.forward - std::sin(yaw) * input.side) * d;
     float r = std::hypot(player.x, player.z);
@@ -642,6 +739,18 @@ public:
       }
     }
     float pumpX = player.x - URANIUM_PUMP.x, pumpZ = player.z - URANIUM_PUMP.z;
+    if (expedition.enabled) {
+      float a = coffeeYaw(), c = std::cos(a), sn = std::sin(a);
+      Vec3 offset = player - COFFEE_MACHINE;
+      float x = offset.x * c - offset.z * sn, z = offset.x * sn + offset.z * c;
+      if (std::abs(x) < 1.65f && std::abs(z) < 1.2f) {
+        if (1.65f - std::abs(x) < 1.2f - std::abs(z))
+          x = x < 0 ? -1.65f : 1.65f;
+        else
+          z = z < 0 ? -1.2f : 1.2f;
+        player = coffeePoint({x, player.y - CORE_HEIGHT, z});
+      }
+    }
     if (expedition.enabled && std::abs(pumpX) < 2.75f && std::abs(pumpZ) < 1.25f) {
       if (2.75f - std::abs(pumpX) < 1.25f - std::abs(pumpZ))
         player.x = URANIUM_PUMP.x + (pumpX < 0 ? -2.75f : 2.75f);
@@ -666,7 +775,7 @@ public:
 #include "manual_combat.inl"
   void fire() {
     const auto& s = module.spec();
-    if (mode != Mode::Mounted || cooldown > .00001f || blocked() || tactical ||
+    if (mode != Mode::Mounted || cooldown > .00001f || blocked() || tactical || coffee.active ||
         module.kind == Gun::Lance)
       return;
     if (module.kind == Gun::Pulse && module.plasma && manualProjectiles.size() + 20 > 1024)
@@ -687,6 +796,7 @@ public:
     recoil = 1;
     shotFlash = .09f;
     ++shots;
+    feedback.shot(module.kind, module.kind == Gun::Pulse && module.plasma);
     ++world.fired[s.audio];
     Vec3 direction = forward();
     if (module.kind == Gun::Pulse && module.plasma) {
@@ -696,6 +806,8 @@ public:
       world.beam(muzzle(), hit.point, s.color, .12f, .16f);
       world.beam(muzzle(), hit.point, {1, 1, 1}, .035f, .1f);
       world.sparks(hit.point, s.color, 6, 4);
+      if (hit.id < 0 && direction.y < 0 && std::abs(hit.point.y) < .01f)
+        world.groundMarks.spot(hit.point, .32f, 3.5f, .35f);
       if (hit.id >= 0) {
         markTarget(hit.id);
         world.hurt(hit.id, s.damage * module.damageMultiplier + flatDamage, Laser);
@@ -747,11 +859,14 @@ public:
     if (mode == Mode::Selection || blocked() || dt <= 0)
       return;
     dt = std::min(dt, .05f);
+    bool coffeeWasActive = coffee.active;
+    updateCoffee(dt);
     deckClock += dt;
     flameMorph += (float(flameFocused) - flameMorph) * std::min(1.f, dt * 12);
     if (expedition.miningStarted)
       buttonAge = std::min(5.f, buttonAge + dt);
-    move(input, dt);
+    if (!coffeeWasActive)
+      move(input, dt);
     transition += dt;
     if (mode == Mode::Raising) {
       hatch = std::min(1.f, transition / .6f);
@@ -823,6 +938,14 @@ public:
       updateSmartTarget();
       smartClock = .08f;
     }
+    feedback.step(dt, module.kind, mode == Mode::Mounted && !tactical && !coffee.active,
+                  input.fire, lanceActive, lanceReserveActive);
+    if (module.kind == Gun::Lance && feedback.triggerHeld && lanceActive) {
+      yaw += feedback.aimDelta.x;
+      pitch = std::clamp(pitch+feedback.aimDelta.y,-1.12f,.65f);
+      gunYaw = yaw;
+      gunPitch = pitch;
+    }
     stepLance(dt, input.fire);
     if (input.fire) {
       for (int burst = 0; burst < 16 && cooldown <= .00001f; ++burst) {
@@ -842,6 +965,8 @@ public:
       b.pos = hit.point;
       b.velocity.y -= 1.5f * dt;
       b.life -= dt;
+      if (hit.id < 0 && b.previous.y > 0 && b.pos.y <= .01f)
+        world.groundMarks.spot(b.pos, .16f, 2.5f);
       if (hit.id >= 0) {
         markTarget(hit.id);
         world.hurt(hit.id, b.damage, Minigun);

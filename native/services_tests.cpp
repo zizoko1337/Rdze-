@@ -38,9 +38,14 @@ int main() {
       s.player = {0, CORE_HEIGHT + 1.72f, 5.8f};
       require(s.nearStartButton() && s.interact() && s.expedition.miningStarted && s.buttonAge == 0,
               "Button cannot start extraction");
-      require(!s.startExtraction() && s.world.active.size() == 15,
-              "Button starts twice / duplicates initial enemies");
+      require(!s.startExtraction() && s.world.active.empty() && s.spawnTimer == .5f,
+              "Button starts twice or creates an immediate enemy pack");
       tick(s, 1);
+      require(s.world.active.size() == 1, "Opening frontier does not spawn enemies gradually");
+      const auto& first = s.world.foes[s.world.active.front()];
+      require(std::hypot(first.x, first.z) >= Frontier::SPAWN_MIN - 4 &&
+                  std::hypot(first.x, first.z) <= Frontier::SPAWN_MAX,
+              "First enemy does not approach from the frontier");
       float age = s.buttonAge;
       s.world.paused = true;
       tick(s, 1);
@@ -61,7 +66,7 @@ int main() {
                   !s.terminalOpen,
               "Right console is not services-only");
       require(!s.chooseUpgrade(0), "Services console consumes upgrade reward");
-      std::cout << "PASS manual start, idle preparation, one initial wave, animated-button clock "
+      std::cout << "PASS manual start, idle preparation, gradual frontier arrivals, animated-button clock "
                    "and separate consoles\n";
     }
     {

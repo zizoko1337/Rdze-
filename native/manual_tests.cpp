@@ -194,14 +194,16 @@ int main() {
       require(s.lanceCharge == charge, "Lance charge ignores pause");
       s.world.paused = false;
       tick(s, 3.3f, true);
-      require(s.shots == 1 && std::abs(s.world.foes[id].hp - 7880) < 2 && s.cooldown > 0,
+      require(s.module.spec().damage == WEAPONS[arsenal::Lance].damage,
+              "Manual and automatic lance have different base beam DPS");
+      require(s.shots == 1 && std::abs(s.world.foes[id].hp - (10000 - 3 * 1650 - 200)) < 2 && s.cooldown > 0,
               "Lance full three-second beam damage / cooling wrong");
       Session cancel;
       mount(cancel, Gun::Lance);
       tick(cancel, 1, true);
       tick(cancel, .1f);
       require(cancel.lanceCharge == 0 && cancel.shots == 0, "Partial charge survives release");
-      std::cout << "PASS lance charge, pause, 3s continuous 640DPS beam, cooling and release "
+      std::cout << "PASS lance charge, pause, 3s continuous 1650DPS beam, cooling and release "
                    "cancellation\n";
     }
     {

@@ -59,17 +59,17 @@ int main() {
       aim(s, s.world.targetPoint(a));
       s.lanceCharge = 1.8f;
       s.stepLance(.01f, true);
-      require(std::abs(s.world.foes[a].hp - 9793.6f) < .02f,
+      require(std::abs(s.world.foes[a].hp - 9783.5f) < .02f,
               "Lance first contact lacks 200 damage");
       s.stepLance(.01f, true);
-      require(std::abs(s.world.foes[a].hp - 9787.2f) < .02f, "Contact bonus repeats every tick");
+      require(std::abs(s.world.foes[a].hp - 9767.f) < .02f, "Contact bonus repeats every tick");
       aim(s, s.world.targetPoint(b));
       s.stepLance(.01f, true);
-      require(std::abs(s.world.foes[b].hp - 9793.6f) < .02f,
+      require(std::abs(s.world.foes[b].hp - 9783.5f) < .02f,
               "Sweeping onto new target lacks bonus");
       aim(s, s.world.targetPoint(a));
       s.stepLance(.01f, true);
-      require(std::abs(s.world.foes[a].hp - 9780.8f) < .03f,
+      require(std::abs(s.world.foes[a].hp - 9750.5f) < .03f,
               "Returning to target repeats contact bonus");
       require(s.world.beams.empty(), "Lance still emits old tick-based beam segments");
       s.world.hurt(a, s.world.foes[a].hp, Laser);
@@ -78,7 +78,7 @@ int main() {
       require(reused == a, "Reuse fixture wrong");
       aim(s, s.world.targetPoint(reused));
       s.stepLance(.01f, true);
-      require(std::abs(s.world.foes[reused].hp - 9793.6f) < .03f,
+      require(std::abs(s.world.foes[reused].hp - 9783.5f) < .03f,
               "New generation in same slot loses contact bonus");
       std::cout
           << "PASS lance 200 first-contact, sweeps, no repeat, safe reuse and no stale beam FX\n";

@@ -16,6 +16,7 @@ void quiet(Session& s) {
   s.spawnTimer = s.frontier.nextBoss = s.frontier.nextElite = 100000;
 }
 void acquire(Session& s, Upgrade u, Rarity rarity = Rarity::Uncommon) {
+  rarity = s.expedition.effectiveRarity(u, rarity);
   s.expedition.rewards.push_front(
       {1, {u, Upgrade::Mining, Upgrade::Hull}, {rarity, Rarity::Common, Rarity::Common}});
   s.terminalOpen = true;
@@ -43,19 +44,19 @@ int main() {
         acquire(a, Upgrade::RoverFactory);
         acquire(a, Upgrade::RoverBatch, Rarity(tier));
         acquire(a, Upgrade::RoverRate, Rarity(tier));
-        require(a.expedition.roverBatch == tier + 2 &&
+        require(a.expedition.roverBatch == tier + 6 &&
                     std::abs(a.expedition.roverRate - (1.1f + tier * .1f)) < .0001f,
                 "Rarity does not scale production quantity / rate");
         require(!a.expedition.eligible(Upgrade::RoverFactory), "Factory unlock repeats");
         tick(a, .05f);
-        require(a.frontier.roversMade == uint64_t(tier + 2), "Initial production batch wrong");
+        require(a.frontier.roversMade == uint64_t(tier + 6), "Initial production batch wrong");
         float clock = a.frontier.productionClock;
         a.world.paused = true;
         tick(a, 2);
         require(a.frontier.productionClock == clock, "Production ignores pause");
         a.world.paused = false;
         tick(a, a.expedition.roverInterval() + .1f);
-        require(a.frontier.roversMade == uint64_t(2 * (tier + 2)), "Production cadence wrong");
+        require(a.frontier.roversMade == uint64_t(2 * (tier + 6)), "Production cadence wrong");
       }
       std::cout << "PASS factory gating, all five batch/rate tiers, actual production and pause\n";
     }
@@ -65,10 +66,10 @@ int main() {
       int a = enemy(s, 20, 0), b = enemy(s, 20, 1);
       s.frontier.rovers.push_back({{18, .8f, 0}});
       tick(s, .05f);
-      require(s.world.foes[a].hp <= 0 && s.world.foes[b].hp == 100 && s.frontier.roverHits == 1 &&
-                  s.frontier.rovers.empty() && s.frontier.roverDamage == 100 &&
-                  s.world.damageDone[Laser] == 0,
-              "Rover fails one-hit crawler or applies area damage / weapon stats");
+      require(s.world.foes[a].hp <= 0 && s.world.foes[b].hp <= 0 && s.frontier.roverHits == 1 &&
+                  s.frontier.rovers.empty() && s.frontier.roverDamage == 200 &&
+                  s.world.damageDone[Laser] == 0 && s.world.damageDone[Rocket] == 0,
+              "Rover blast misses nearby crawler or pollutes turret stats");
       Session retarget(true, true);
       quiet(retarget);
       int first = enemy(retarget, 40, 0), second = enemy(retarget, 80, 0);
@@ -83,7 +84,7 @@ int main() {
       tick(retarget, .3f);
       require(retarget.frontier.rovers.front().target == second,
               "Rover follows a recycled enemy slot instead of retargeting");
-      std::cout << "PASS nearest pursuit, 100 single-target damage, no friendly stat pollution and "
+      std::cout << "PASS nearest pursuit, rocket-sized area blast, no turret stat pollution and "
                    "safe retarget\n";
     }
     {
@@ -160,8 +161,11 @@ int main() {
       require(s.expedition.rewards[0].source == RewardSource::BossCrystal &&
                   s.expedition.rewards[1].source == RewardSource::EliteCrystal,
               "Reward lost crystal provenance");
-      for (auto r : s.expedition.rewards[0].rarities)
-        require(r >= Rarity::Rare, "Boss crystal rolled below Rare");
+      for (int c = 0; c < 3; ++c) {
+        auto& offer = s.expedition.rewards[0];
+        require((isTower(offer.choices[c]) && !isSupport(towerWeapon(offer.choices[c]))) ||
+                    offer.rarities[c] >= Rarity::Rare, "Boss non-delivery card rolled below Rare");
+      }
       auto before = s.expedition.rewards[0];
       s.terminalOpen = true;
       s.interact();
@@ -215,7 +219,7 @@ int main() {
       }
       s.world.time = 900;
       int crawler = s.frontier.spawnFoe(s.world, Crawler, 200, 0);
-      require(s.world.foes[crawler].maxHp == Frontier::ROVER_DAMAGE,
+      require(s.world.foes[crawler].maxHp == SPECIES[Crawler].hp,
               "Basic crawler scales beyond base rover damage");
       std::cout << "PASS boss quality odds, warning, 3-minute schedule, respite and five species "
                    "progression\n";

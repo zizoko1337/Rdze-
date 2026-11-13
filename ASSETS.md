@@ -6,6 +6,12 @@ Nowy natywny poligon ma sześć dodatkowych grafik przeciwników, w tym dwóch b
 
 Wygenerowano wbudowanym narzędziem `image_gen` (umiejętność `imagegen`), bez CLI i bez klucza API. Pliki skopiowane do projektu; gra nie odwołuje się do katalogu generatora. Model działka jest autorską geometrią 3D według szkicu użytkownika: prostokątny nieruchomy słup, prostokątna obrotowa głowica, krótka lufa i czerwony emiter. Żółta błyskawica jest rysowana proceduralnie na przezroczystej teksturze.
 
+## public/assets/ground-basalt.png
+
+Tekstura bazaltowego podłoża wersji natywnej. Wygenerowana wbudowanym `image_gen` przy użyciu umiejętności `imagegen` i skopiowana do repozytorium. Pełny prompt:
+
+> Use case: stylized-concept. Production asset: one seamless tileable ground albedo texture for an existing dark science-fiction tower-defense game on an alien basalt planet. Square 1024x1024 texture, perfectly straight overhead orthographic view covering the entire frame, evenly lit diffuse material with no directional lighting, ambient shadow or vignette. Muted cool gray charcoal basalt dust and compacted fine gravel, restrained warm-gray mineral flecks, small shallow irregular rock fissures and worn crushed stone. Medium-low contrast, matte, subtle broad mottling, no distinct hero rock and no strong repeated patterns; ground should remain quiet so orange glowing weapon traces are readable. At in-game scale the tile represents approximately 10 metres across. All four edges seamlessly repeat in both directions. No perspective, horizon, buildings, creatures, vegetation, sci-fi circuitry, text, glow, footprints, craters, black holes, outlines, transparency or presentation border. Output a flat game texture, not a scene or a sample sphere.
+
 ## public/assets/alien-beast.png
 
 Przezroczysty sprite bestii. Pełny prompt:

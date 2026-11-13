@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL3/SDL.h>
 #include "gameplay.hpp"
+#include "manual_sound.hpp"
 
 namespace arsenal {
 class GameAudio {
@@ -14,6 +15,7 @@ class GameAudio {
   std::array<uint64_t, WeaponCount> last{};
   std::array<float, WeaponCount> lastTime{};
   uint64_t lastBrimstone = 0, lastOverload = 0;
+  command::ManualSound manualSound;
 
 public:
   bool enabled = true;
@@ -47,15 +49,18 @@ public:
     last.fill(0);
     lastTime.fill(-1);
     voices.clear();
+    manualSound.reset();
     lastBrimstone = lastOverload = 0;
   }
   void build() {
     if (enabled && voices.size() < 32)
       voices.push_back({0, 0, .2f, 880, .055f, 0});
   }
-  void update(const Game& g) {
+  void update(const Game& g, command::ManualAudioState manual = {}) {
     if (!stream)
       return;
+    manual.active = manual.active && enabled && !g.paused;
+    manualSound.set(manual);
     if (enabled && !g.paused) {
       if (g.brimstonePulses > lastBrimstone && voices.size() < 30)
         voices.push_back({0, 0, .72f, 78, .24f, 100});
@@ -83,7 +88,7 @@ public:
     float buffer[block];
     while (queued < 2048 * int(sizeof(float))) {
       for (int s = 0; s < block; ++s) {
-        float out = 0;
+        float out = manualSound.sample();
         for (auto& v : voices) {
           if (v.age >= v.duration)
             continue;

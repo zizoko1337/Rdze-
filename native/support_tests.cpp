@@ -17,7 +17,7 @@ void tick(Session& s, float seconds) {
 bool acquire(Session& s, Upgrade u) {
   s.expedition.rewards.push_front({1,
                                    {u, Upgrade::Hull, Upgrade::Mining},
-                                   {Rarity::Legendary, Rarity::Common, Rarity::Common}});
+                                   {s.expedition.effectiveRarity(u, Rarity::Legendary), Rarity::Common, Rarity::Common}});
   s.terminalOpen = true;
   return s.chooseUpgrade(0);
 }
@@ -52,9 +52,13 @@ int main() {
       }
       s.expedition.rewards.front().choices = {Upgrade::LanceTower, Upgrade::FrostSupportTower,
                                               Upgrade::Sentry};
+      s.expedition.rewards.front().rarities[2] = Rarity::Common;
       s.expedition.validateFront();
       const auto& o = s.expedition.rewards.front().choices;
-      require(!isTower(o[0]) && !isTower(o[1]) && o[2] == Upgrade::Sentry && o[0] != o[1],
+      require(s.expedition.eligible(o[0], s.expedition.rewards.front().rarities[0]) &&
+                  s.expedition.eligible(o[1], s.expedition.rewards.front().rarities[1]) &&
+                  o[0] != Upgrade::LanceTower && o[1] != Upgrade::FrostSupportTower &&
+                  o[2] == Upgrade::Sentry && o[0] != o[1] && o[0] != o[2] && o[1] != o[2],
               "Queued type-limited choices not repaired");
       std::cout << "PASS four combat / two support types, repeat copies and queued pool repair\n";
     }
@@ -80,7 +84,7 @@ int main() {
       require(g.towers[1].localRate == 1.2f && g.towers[1].localRange == 1.2f,
               "Support types do not combine, or same type stacks");
       g.towerRange = 1.5f;
-      require(std::abs(g.weaponInfo(g.towers[1]).range - 65 * 1.5f * 1.2f) < .001f,
+      require(std::abs(g.weaponInfo(g.towers[1]).range - WEAPONS[Laser].range * 1.5f * 1.2f) < .001f,
               "Local range does not multiply existing upgrades");
       for (const auto& t : g.towers)
         if (isSupport(t.type))
@@ -104,7 +108,7 @@ int main() {
       ranged.addTower(RangeRelay, 21, 42);
       target(base, 0, 92);
       target(boosted, 0, 92);
-      int far = target(ranged, 0, 116); // 74 m, beyond base 65 m.
+      int far = target(ranged, 0, 132); // 90 m: beyond base 80 m, inside supported 96 m.
       tick(base, 20);
       tick(boosted, 20);
       tick(ranged, 1);

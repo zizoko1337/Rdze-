@@ -33,7 +33,7 @@ Loty, kryształy, jednostki, produkcja i napór zatrzymują się przy pauzie, te
 
 ## Produkcja jeździków
 
-Fabryka jest jednorazową kartą od Uncommon. Uruchamia serię jednej jednostki co 12 s, z pierwszą maszyną od razu po wznowieniu czasu. Każda maszyna ma nowy sprite od tyłu, szuka najbliższego przeciwnika, dojeżdża do niego z prędkością 24 m/s i zadaje 100 obrażeń wyłącznie jemu. Eksplozja i iskry są wizualne; nie ma zapytania o cele w obszarze. Wspólny cel może zwiększać otrzymywane przez przeciwnika obrażenia.
+Fabryka jest jednorazową kartą od Uncommon. Uruchamia serię **5 jednostek co 12 s**, z pierwszą serią od razu po wznowieniu czasu. Każda maszyna ma sprite od tyłu, szuka najbliższego przeciwnika, dojeżdża do niego z prędkością 24 m/s i wybucha w promieniu **4 m**, za **180 obrażeń w centrum**. Bossowie otrzymują 55% obrażeń; obrażenia maleją z odległością od środka wybuchu. Wspólny cel może zwiększać otrzymywane obrażenia. [Aktualny balans](BALANS_WIEZYCZEK.md).
 
 Maszyny mają sprite 1,75 m (połowa wcześniejszego rozmiaru) i wychodzą we wszystkich kierunkach, na trzech bliskich pierścieniach wokół rdzenia. Omijają cylinder rdzenia. Niewielkie różnice prędkości i boczne korekty rozluźniają kolumny. Raz na klatkę budowana jest siatka ruchu o komórkach 3 m: pojazd sprawdza zagregowane pozycje w dziewięciu komórkach, bez porównywania każdej pary samochodów. Bufory są rezerwowane z góry. Po śmierci celu szukają nowego. Numer generacji przeciwnika chroni przed pościgiem za nową jednostką, która wykorzystała ten sam identyfikator. Jednostki bez celu czekają i ponawiają wyszukiwanie; po 60 s znikają. Limit aktywnych maszyn to 2048, seria do 128, a maksymalne tempo produkcji to jedna seria co 0,5 s.
 

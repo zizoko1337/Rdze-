@@ -24,7 +24,7 @@ Jeżeli brakuje kompilacji, START przygotuje ją lokalnym kompilatorem. Pierwsze
 | --- | --- | --- |
 | 1 | Laser | Szybkie pewne trafienia; obracana głowica, emiter i chłodzenie. |
 | 2 | Minigun | Rozkręcający się zestaw sześciu luf i mechanizm podawania amunicji. |
-| 3 | Tesla | Pioruny do wszystkich przeciwników w zasięgu; 5,5 s odnowienia, ruchome ramiona i cewki. |
+| 3 | Tesla | Pioruny do wszystkich przeciwników w zasięgu; 1,8 s odnowienia, silna przeciw hordom, słaba przeciw bossom. |
 | 4 | Snajper | Duży zasięg i obrażenia; odrzut długiej lufy i ruch zamka. |
 | 5 | Lanca | 6 s ładowania, 3 s ciągłej wiązki, następnie chłodzenie; rozsuwane i obracane elementy głowicy. |
 | 6 | Jad | Pociski i trujące chmury z obrażeniami w czasie; zielone zbiorniki i tłoki. |
@@ -32,7 +32,7 @@ Jeżeli brakuje kompilacji, START przygotuje ją lokalnym kompilatorem. Pierwsze
 | 8 | Moździerz | Pociski po wysokim łuku, eksplozje obszarowe; odrzut lufy i hydraulika. |
 | 9 | Palnik | Stożek ognia i podpalenie; ruch pompy i elementów chłodzenia. |
 
-Bronie wybierające pojedynczy cel utrzymują go do śmierci albo wyjścia z zasięgu. Nie ma losowego pudłowania. Tesla, eksplozje, chmury i palnik obejmują wiele jednostek zgodnie ze swoim obszarem działania. Nieruchoma podstawa pozostaje oddzielona od obracanej głowicy.
+Bronie wybierające pojedynczy cel utrzymują go do śmierci albo wyjścia z zasięgu; snajper i lanca przełączają na cel wyższego priorytetu: boss → elita → zwykły. Ostrzał wymaga ustawienia lufy. Tesla, eksplozje, chmury i palnik obejmują wiele jednostek zgodnie ze swoim obszarem działania. Nieruchoma podstawa pozostaje oddzielona od obracanej głowicy. [Aktualne parametry i testy](BALANS_WIEZYCZEK.md).
 
 ## Sterowanie
 

@@ -96,7 +96,7 @@ public:
   Com<ID3D11ShaderResourceView> wormTexture;
   std::vector<Instance> wormSegments;
   std::vector<Instance> boxes, tubes, glowBoxes, glowTubes, glowRocks, beams, hot, smoke, ringData,
-      shadows, rocks, crystals, worldLetters, bossHealth, gunLetters;
+      shadows, rocks, crystals, worldLetters, bossHealth, gunLetters, groundScars, groundHeat;
   explicit GameScene(Renderer& r, const std::filesystem::path& assets) {
     extraOpaque.reserve(8);
     r.makeArsenalMeshes();
@@ -118,6 +118,8 @@ public:
     hot.reserve(22000);
     smoke.reserve(22000);
     ringData.reserve(2000);
+    groundScars.reserve(GroundMarks::capacity);
+    groundHeat.reserve(GroundMarks::capacity);
     shadows.reserve(MAX_FOES + MAX_TOWERS);
     worldLetters.reserve(1024);
     bossHealth.reserve(128);
@@ -260,17 +262,37 @@ public:
       b({.9f, h - .1f, -1.1f + t.recoil * .8f}, {.3f, .4f, .8f}, accent);
       break;
     case Lance: {
-      float charge = t.state == 0 ? t.phase / 6 : t.state == 1 ? 1 : 0;
-      float spread = .85f + charge * .65f;
-      b({0, h, -.5f}, {2.1f, 1.8f, 2.8f}, dark);
-      cy({0, h, 1}, {.48f, 3.5f, .48f}, steel, PI / 2);
-      for (int k = 0; k < 4; ++k) {
-        float a = t.spin * .35f + k * PI / 2;
-        float x = std::sin(a) * spread, y = std::cos(a) * spread;
-        b({x, h + y, 1.2f}, {.4f, .4f, 3.5f}, steel);
-        b({x, h + y, 1.2f}, {.16f, .46f, 2.8f}, accent, 0, 0, true);
+      // Same open, twin-rail accelerator and three counter-rotating rings as the manual lance.
+      float charge = std::clamp(t.state == 0 ? t.phase / 6 : t.state == 1 ? 1.f : 0.f, 0.f, 1.f);
+      Color metal = preview || t.disabledUntil > time ? steel : Color{.3f, .38f, .42f};
+      Color casing = preview ? dark : t.disabledUntil > time ? Color{.09f, .07f, .12f}
+                                                               : Color{.055f, .09f, .12f};
+      b({0, h - .65f, -.45f}, {2.05f, .32f, 1.85f}, casing);
+      b({0, h, -.65f}, {1.55f, .95f, 1.55f}, casing);
+      b({0, h + .5f, -.85f}, {1.62f, .10f, .95f}, metal);
+      for (float side : {-1.f, 1.f}) {
+        float x = side * (.60f + charge * .23f);
+        b({x, h, 1.18f}, {.30f, .48f, 2.95f}, casing);
+        b({x - side * .16f, h, 1.2f}, {.045f, .28f, 2.80f}, accent, 0, 0, true);
+        for (int i = 0; i < 4; ++i)
+          b({x + side * .12f, h + .30f, .25f + i * .58f}, {.62f, .10f, .24f}, metal);
+        rod(world({side * .72f, h - .23f, -.7f}), world({side * 1.02f, h - .23f, -.7f}), .25f, metal);
+        rod(world({side * .62f, h - .38f, -.95f}), world({side * .98f, h - .47f, -.2f}), .085f, casing);
+        rod(world({side * .98f, h - .47f, -.2f}), world({x, h - .25f, .45f}), .085f, metal);
       }
-      cy({0, h, 2.8f}, {.25f + charge * .4f, .2f, .25f + charge * .4f}, accent, PI / 2, true);
+      for (int ring = 0; ring < 3; ++ring) {
+        float z = .55f + ring * .85f, radius = .62f + charge * .20f;
+        float phase = t.spin * (ring % 2 ? -1.f : 1.f);
+        for (int i = 0; i < 12; ++i) {
+          float a = phase + i * PI / 6, next = a + PI / 6;
+          rod(world({std::sin(a) * radius, h + std::cos(a) * radius, z}),
+              world({std::sin(next) * radius, h + std::cos(next) * radius, z}),
+              ring == 1 ? .065f : .055f, ring == 1 ? accent : metal, ring == 1);
+        }
+      }
+      for (int i = 0; i < 4; ++i)
+        b({-.48f + i * .32f, h + .13f, -1.45f}, {.17f, .08f + charge * .15f, .04f},
+          accent, 0, 0, true);
       break;
     }
     case Venom:
@@ -371,8 +393,22 @@ public:
     for (auto& v : enemies)
       v.clear();
     for (auto* v : {&boxes, &tubes, &glowBoxes, &glowTubes, &glowRocks, &beams, &hot, &smoke,
-                    &ringData, &shadows, &worldLetters, &bossHealth, &gunLetters})
+                    &ringData, &shadows, &worldLetters, &bossHealth, &gunLetters, &groundScars, &groundHeat})
       v->clear();
+    for (const auto& m : g.groundMarks.marks) {
+      Vec3 d = m.b-m.a, center = (m.a+m.b)*.5f;
+      float width = m.radius*2, extent = length(d)+width;
+      float yaw = std::atan2(d.x,d.z), fade = std::min(1.f,m.life/1.5f);
+      groundScars.push_back(instance(center,{width,extent,1},{.035f,.022f,.016f},yaw,extent/width,fade*.65f));
+      float age = m.duration-m.life;
+      float heat = m.heat > 0 ? std::max(0.f,1-age/m.heat) : 0;
+      if (heat > 0) {
+        center.y += .005f;
+        // A narrow hot centre cools to a broad dark scar without animated noise.
+        float hotWidth = width*.65f, hotExtent = length(d)+hotWidth;
+        groundHeat.push_back(instance(center,{hotWidth,hotExtent,1},{1, .07f+.48f*heat, .01f},yaw,hotExtent/hotWidth,heat*.85f));
+      }
+    }
     core(g.time, commandDeck);
     for (const auto& t : g.towers) {
       makeTower(t, g.time);
@@ -440,7 +476,7 @@ public:
       Color color{1, 1, 1};
       if (e.elite)
         color = {1.45f, .9f, .5f};
-      if (e.poison > 0)
+      if (e.poison > 0 || e.towerPoisonDps > 0)
         color = {.7f, 1, .6f};
       if (e.stun > 0)
         color = {.45f, .7f, 1.5f};
@@ -533,6 +569,8 @@ public:
         instance({0, -.05f, 0}, {WORLD_RADIUS * 2, 1, WORLD_RADIUS * 2}, {.15f, .2f, .225f});
     r.draw(r.ground, &floor, 1, r.white, 3);
     r.draw(r.quad, shadows, r.white, 12);
+    r.draw(r.quad, groundScars, r.white, 23);
+    r.draw(r.quad, groundHeat, r.white, 24);
     r.draw(r.rock, rocks, r.white, 0);
     r.draw(r.rock, crystals, r.white, 6);
     r.draw(r.cube, boxes, r.metal, 0);

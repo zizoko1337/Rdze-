@@ -131,7 +131,9 @@ struct UpgradeLab {
     float x = ui.width * .49f;
     if (!cards.empty()) {
       auto kind = cards[selected];
-      Rarity effective = std::max(rarity, minimumRarity(kind));
+      Rarity effective = s.expedition.effectiveRarity(kind, rarity);
+      if (fixedRarity(kind) >= 0)
+        effective = Rarity(fixedRarity(kind));
       if (kind == Upgrade::FlatDamage || kind == Upgrade::Luck)
         effective = Rarity::Common;
       if (kind == Upgrade::ServiceCredit)
@@ -139,7 +141,7 @@ struct UpgradeLab {
       ui.text(r, x, 237, UPGRADES[size_t(kind)].name, 27, GameUi::white);
       ui.text(r, x, 286, std::string("Rzadkość dodania: ") + RARITIES[int(effective)].name, 16,
               RARITIES[int(effective)].color);
-      ui.paragraph(r, x, 332, upgradeDescription(kind, effective), 62, 17, GameUi::muted);
+      ui.paragraph(r, x, 332, s.expedition.cardDescription(kind, effective), 62, 17, GameUi::muted);
       ui.panel(r, addButton(ui));
       ui.text(r, x + 20, 619, "[ENTER] DODAJ ULEPSZENIE", 20, GameUi::mint);
     } else

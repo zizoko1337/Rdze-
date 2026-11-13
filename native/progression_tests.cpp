@@ -11,6 +11,7 @@ void tick(Session& s, float seconds) {
     s.step(1.f / 60);
 }
 bool install(Session& s, Upgrade u, Rarity rarity = Rarity::Uncommon) {
+  rarity = s.expedition.effectiveRarity(u, rarity);
   s.expedition.rewards.push_front(
       {99, {u, Upgrade::Hull, Upgrade::Mining}, {rarity, Rarity::Uncommon, Rarity::Uncommon}});
   s.terminalOpen = true;
@@ -34,6 +35,7 @@ int main() {
       // Catalogue coverage includes both starters; Session gates a real run to its selected gun.
       e.manualMinigun = true;
       e.manualLance = true;
+      e.towerUnlocked.fill(true);
       lucky.luck = 100;
       std::array<int, 5> counts{};
       std::array<bool, size_t(Upgrade::Count)> seen{};
@@ -126,8 +128,8 @@ int main() {
         tick(base, 16);
         tick(upgraded, 16);
         double a = base.world.damageDone[w], b = upgraded.world.damageDone[w];
-        // The new fixed poison-status bonus is deliberately not a tower-damage multiplier.
-        require(a > 0 && (w == Venom ? b > a * 1.05 && b < a * 1.2 : std::abs(b / a - 1.2) < .015),
+        // Tower venom is separate from the manual poison-status bonus and scales as a whole.
+        require(a > 0 && std::abs(b / a - 1.2) < .015,
                 "Tower damage bonus fails on a weapon, projectile or DOT");
       }
       Session base(true, true), boosted(true, true);

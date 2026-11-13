@@ -112,6 +112,43 @@ int main(int, char**) {
     terrainJitter /= 31;
     ViewState passive;
     passive.building = false;
+    // Render real ground mark batches: visible heat, cooled scar, then exact restoration.
+    double groundHeatDelta = 0, groundScarDelta = 0, groundExpiredDelta = 0;
+    {
+      Game groundFx(false);
+      groundFx.autoWaves = false;
+      Camera camera;
+      camera.eye = {7, 12, 30};
+      camera.target = {0, 0, 45};
+      camera.farClip = 5000;
+      std::vector<uint8_t> baseline;
+      for (int phase = 0; phase < 4; ++phase) {
+        if (phase == 1) {
+          for (int n = 0; n < 12; ++n) {
+            float x = float(n)-6;
+            groundFx.groundMarks.stroke({x,0,45+std::sin(x*.5f)*2},
+                                       {x+1,0,45+std::sin((x+1)*.5f)*2},.34f,4.5f,1.6f);
+          }
+          groundFx.groundMarks.spot({-5,0,40},.32f,3.5f,.35f);
+          groundFx.groundMarks.spot({-3,0,40},.16f,2.5f);
+          groundFx.groundMarks.spot({-1,0,40},.5f,4,.2f);
+          groundFx.groundMarks.spot({4,0,46},2,6,.8f);
+        } else if (phase == 2) groundFx.groundMarks.tick(2);
+        else if (phase == 3) groundFx.groundMarks.tick(5);
+        scene.prepare(groundFx,passive,true);
+        r.begin(camera,0,-1);
+        scene.render(r);
+        r.end();
+        probe.blankFraction(r);
+        if (phase == 0) baseline = probe.sampledRgb;
+        else if (phase == 1) groundHeatDelta = probe.meanDelta(baseline);
+        else if (phase == 2) groundScarDelta = probe.meanDelta(baseline);
+        else groundExpiredDelta = probe.meanDelta(baseline);
+        const char* names[] = {"clean", "hot", "cooled", "expired"};
+        r.screenshot(artifacts / (std::string("ground-")+names[phase]+".png"));
+        r.present(false);
+      }
+    }
     // Reproduce the reported case: mounted gun, aimed down, rotating extremely slowly.
     int slowFrames = 0, slowBlackSpikes = 0;
     double slowMaxLumaJump = 0, slowMaxPixelDelta = 0;
@@ -133,6 +170,7 @@ int main(int, char**) {
         Camera camera;
         camera.eye = slow.eye();
         camera.target = camera.eye + slow.forward();
+        applyManualCamera(camera, slow.feedback.pose);
         camera.farClip = 5000;
         scene.prepare(slow.world, passive, true);
         buildCommandDeck(scene, slow);
@@ -195,6 +233,7 @@ int main(int, char**) {
         Camera camera;
         camera.eye = s.eye();
         camera.target = camera.eye + s.forward();
+        applyManualCamera(camera, s.feedback.pose);
         camera.farClip = 5000;
         if (!std::isfinite(camera.eye.x + camera.eye.y + camera.eye.z + s.yaw + s.pitch))
           throw std::runtime_error("Nonfinite camera transform");
@@ -227,12 +266,16 @@ int main(int, char**) {
       }
     }
     bool passed =
-        blankFrames == 0 && terrainJitter < .1 && slowBlackSpikes == 0 && slowMaxLumaJump < 10;
+        blankFrames == 0 && terrainJitter < .1 && slowBlackSpikes == 0 && slowMaxLumaJump < 10 &&
+        groundHeatDelta > .05 && groundScarDelta > .01 && groundExpiredDelta < .001;
     std::ofstream out(artifacts / "result.json");
     out << "{\n  \"passed\": " << (passed ? "true" : "false")
         << ",\n  \"frames_checked\": " << frames << ",\n  \"blank_frames\": " << blankFrames
         << ",\n  \"worst_blank_fraction\": " << worst
         << ",\n  \"terrain_subpixel_delta\": " << terrainJitter
+        << ",\n  \"ground_heat_delta\": " << groundHeatDelta
+        << ",\n  \"ground_scar_delta\": " << groundScarDelta
+        << ",\n  \"ground_expired_delta\": " << groundExpiredDelta
         << ",\n  \"slow_down_frames\": " << slowFrames
         << ",\n  \"slow_down_black_spikes\": " << slowBlackSpikes
         << ",\n  \"slow_down_max_luma_jump\": " << slowMaxLumaJump

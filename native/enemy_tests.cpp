@@ -107,7 +107,7 @@ int main() {
       g.addTower(Laser, 42, 0);
       g.addTower(RateRelay, 63, 0);
       g.addTower(FrostTower, 84, 0);
-      g.addTower(Laser, 110, 0);
+      g.addTower(Laser, 140, 0); // Beyond the new 80 m range of the disabled tower's target.
       int brain = foe(g, Brain, 42, 0);
       int target = foe(g, Crawler, 44, 10);
       require(g.towers[0].localRate == 1.2f && g.movementSlowAt(90, 0) == .5f,
@@ -125,7 +125,7 @@ int main() {
       float hp = g.foes[target].hp;
       tick(g, 3.8f);
       require(g.foes[target].hp == hp && g.towers[0].shots == 0, "Disabled tower still fires");
-      tick(g, .25f);
+      tick(g, .45f); // Recovery also includes physically aiming the barrel after shutdown.
       require(g.towers[0].disabledUntil == 0 && g.towers[0].shots > 0 &&
                   g.towers[0].localRate == 1.2f && g.movementSlowAt(90, 0) == .5f,
               "Tower and support do not recover after four seconds");

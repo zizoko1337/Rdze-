@@ -300,7 +300,7 @@ public:
              tier.color);
         text(r, card.x + 22, card.y + 48, info.category, 11, info.color);
         text(r, card.x + 22, card.y + 80, info.name, std::strlen(info.name) > 24 ? 18 : 22);
-        paragraph(r, card.x + 22, card.y + 122, upgradeDescription(kind, rarity),
+        paragraph(r, card.x + 22, card.y + 122, e.cardDescription(kind, rarity),
                   kind == Upgrade::PlasmaMortar ? 43 : 37, kind == Upgrade::PlasmaMortar ? 12 : 14,
                   muted);
         text(r, card.x + 22, card.y + 252, "ZAINSTALUJ / " + std::to_string(i + 1), 14, tier.color);
@@ -421,6 +421,32 @@ public:
       r.flushText();
       return;
     }
+    if ((s.coffee.active || s.nearCoffee()) && !s.world.paused && !help) {
+      panel(r, {width / 2 - 290, 20, 580, 48});
+      text(r, width / 2 - 266, 33, "ORBITAL COFFEE / STACJA OPERATORA", 19, mint);
+      text(r, 26, 24, "RDZEŃ " + number(s.expedition.hp) + " / " + number(s.expedition.maxHp),
+           14, s.coreWarningLevel() == 2 ? Color{1, .25f, .1f} : mint);
+      text(r, width - 240, 24, "WYPŁATY: " + std::to_string(s.expedition.rewards.size()), 14, mint);
+      float x = width / 2 - 280, y = height - 134;
+      panel(r, {x, y, 560, 110});
+      const auto& c = s.coffee;
+      std::string title = c.active ? (c.drinking() ? "PICIE KAWY" : c.pouring() ? "PARZENIE KAWY"
+                                                                                : "OBSŁUGA EKSPRESU")
+                                   : "[E] ZAPARZ I WYPIJ KAWĘ";
+      text(r, x + 22, y + 12, title, 21, mint);
+      int tier = c.active ? c.servingTier : s.expedition.coffeeTier;
+      text(r, x + 22, y + 45, COFFEE_NAMES[tier - 1], 16, white);
+      text(r, x + 22, y + 76,
+           c.active ? "Pozostało " + number(std::max(0.f, c.duration - float(c.age)), 1) +
+                          " s  /  Walka trwa  /  P: pauza"
+                    : std::to_string(COFFEE_MINUTES[tier - 1]) + " min czujności / cykl " +
+                          number(CoffeeState::cycleDuration(s.expedition.coffeeMachineTier)) + " s",
+           12, muted);
+      if (c.active)
+        rect(r, {x + 22, y + 99, 516 * float(c.age) / c.duration, 3}, mint);
+      r.flushText();
+      return;
+    }
     rect(r, {0, 0, width, 68}, {.015f, .04f, .052f}, .93f);
     text(r, 26, 14, "RDZEŃ / CENTRUM DOWODZENIA", 22, mint);
     text(r, width - 310, 15,
@@ -537,7 +563,24 @@ public:
                              : "Zajęte i zarezerwowane heksy nie przyjmują nowych zrzutów.",
            13, muted);
     } else if (s.mode == Mode::Walking) {
-      if (s.nearStartButton()) {
+      if (s.coffee.active) {
+        panel(r, {width / 2 - 260, height - 147, 520, 85});
+        text(r, width / 2 - 235, height - 134,
+             s.coffee.drinking() ? "PICIE KAWY" : s.coffee.pouring() ? "PARZENIE KAWY" : "OBSŁUGA EKSPRESU",
+             20, mint);
+        text(r, width / 2 - 235, height - 101,
+             std::string(COFFEE_NAMES[s.coffee.servingTier - 1]) + " / " +
+                 number(std::max(0.f, s.coffee.duration - float(s.coffee.age)), 1) + " s", 13, white);
+        rect(r, {width / 2 - 235, height - 76, 470 * float(s.coffee.age) / s.coffee.duration, 3}, mint);
+      } else if (s.nearCoffee()) {
+        panel(r, {width / 2 - 260, height * .64f, 520, 88});
+        text(r, width / 2 - 235, height * .64f + 12, "[E] ZAPARZ I WYPIJ KAWĘ", 24, mint);
+        text(r, width / 2 - 235, height * .64f + 48,
+             std::string(COFFEE_NAMES[s.expedition.coffeeTier - 1]), 14, white);
+        text(r, width / 2 - 235, height * .64f + 69,
+             std::to_string(COFFEE_MINUTES[s.expedition.coffeeTier - 1]) + " min bez senności / cykl " +
+                 number(CoffeeState::cycleDuration(s.expedition.coffeeMachineTier)) + " s", 12, muted);
+      } else if (s.nearStartButton()) {
         panel(r, {width / 2 - 250, height * .64f, 500, 70});
         text(r, width / 2 - 226, height * .64f + 12, "[E] URUCHOM WYDOBYCIE", 25, {1, .3f, .15f});
         text(r, width / 2 - 226, height * .64f + 48, "Naciśnij czerwony przycisk", 13, muted);
@@ -566,6 +609,7 @@ public:
                              ? "Czerwony przycisk za działem uruchamia wydobycie [E]."
                          : s.expedition.enabled && !s.expedition.rewards.empty()
                              ? "Wypłata czeka przy bocznym komputerze. Podejdź i naciśnij E."
+                         : s.coffee.fatigue() > 0 ? "Senność! Ekspres jest po lewej stronie, za fotelem. [E]"
                              : "Podejdź do fotela na środku platformy")
                       : "Kliknij, aby się rozejrzeć. WASD — podejdź do fotela.",
              15);
@@ -608,6 +652,18 @@ public:
       text(r, x - 170, height - 95, "E — opuść stanowisko   |   Mysz — celuj", 11, muted);
     }
     rect(r, {0, height - 46, width, 46}, {.015f, .04f, .052f}, .94f);
+    if (s.expedition.enabled) {
+      Color c = s.coffee.fatigue() > 0 ? Color{1, .42f, .18f} : mint;
+      panel(r, {width - 310, height - 142, 284, 76});
+      text(r, width - 292, height - 129,
+           s.coffee.fatigue() > 0 ? "SENNOŚĆ / POTRZEBUJESZ KAWY" : "KOFEINA / OPERATOR", 13, c);
+      text(r, width - 292, height - 104,
+           s.coffee.fatigue() > 0 ? "Ruch, obrót i widzenie osłabione" :
+               "Czujność: " + number(float(std::ceil(s.coffee.awakeRemaining))) + " s", 12, white);
+      text(r, width - 292, height - 84,
+           "Kawa " + std::to_string(s.expedition.coffeeTier) + "/5  |  Ekspres " +
+               number(CoffeeState::cycleDuration(s.expedition.coffeeMachineTier)) + " s", 10, muted);
+    }
     text(r, 26, height - 33,
          s.tactical ? "WASD kamera   Q/E obrót   Kółko zoom   LPM zrzut/kryształ   C dron   TAB "
                       "powrót   P pauza"
@@ -641,7 +697,7 @@ public:
       text(r, width / 2 - 305, height / 2 - 230, "STANOWISKO OPERATORA", 27, mint);
       text(r, width / 2 - 305, height / 2 - 172,
            "WASD / Shift   Chodzenie / bieg po platformie\nMysz           Rozglądanie / "
-           "celowanie\nE              Działo / komputer / powrót windą\nTAB            Heksy / "
+           "celowanie\nE              Działo / komputer / kawa / winda\nTAB            Heksy / "
            "powrót na pokład\nLPM            Strzelaj / zamów zrzut "
            "(możesz przytrzymać)\n;              Laboratorium ulepszeń\n'              Bestiariusz "
            "/ przywoływanie\nP              Pauza / wznowienie\nR              Powrót do "

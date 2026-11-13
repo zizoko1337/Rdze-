@@ -30,6 +30,10 @@ Tab widok z gory. LPM heks: dostawa dziala; LPM krysztal: wyslij drona.
 C dron po najblizszy krysztal. P pauza. F1 pomoc. F11 pelny ekran.
 R nowa ekspedycja. Alt+F4 wyjscie.
 Radio wyjezdza po schowaniu przycisku. E przy radiu: utwory, pauza i glosnosc.
+Kawa: ekspres po lewej za fotelem. Podejdz od frontu i nacisnij E.
+Po 5 min operator robi sie senny: wolniejszy ruch i obrot dziala, rozmycie i mruganie.
+Kawa I-V daje 5/6/7/8/10 min czujnosci. Ekspres I-III: cykl 3/2/1 s, w tym 0,5 s picia.
+Podczas picia sterowanie jest zablokowane, a walka trwa dalej. P pauzuje calosc.
 
 Uran daje wybor ulepszenia przy bocznym komputerze. Boss co 3 minuty.
 Rdzen regeneruje 3 HP/s. Nanoboty regenerujace zwiekszaja regeneracje.

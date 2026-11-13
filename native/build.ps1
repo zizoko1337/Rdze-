@@ -17,6 +17,10 @@ if (!$GameOnly) {
 if ($LASTEXITCODE -ne 0) { throw 'Arsenal test compilation failed.' }
 & (Join-Path $out 'arsenal-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Arsenal tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'tower_balance_tests.cpp') '-o' (Join-Path $out 'tower-balance-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Tower balance compilation failed.' }
+& (Join-Path $out 'tower-balance-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Tower balance tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'command_tests.cpp') '-o' (Join-Path $out 'command-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Command test compilation failed.' }
 & (Join-Path $out 'command-tests.exe')
@@ -25,6 +29,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Command tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Manual arsenal test compilation failed.' }
 & (Join-Path $out 'manual-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Manual arsenal tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'ground_effect_tests.cpp') '-o' (Join-Path $out 'ground-effect-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Ground effect test compilation failed.' }
+& (Join-Path $out 'ground-effect-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Ground effect tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'manual_feedback_tests.cpp') '-o' (Join-Path $out 'manual-feedback-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Manual feedback compilation failed.' }
+& (Join-Path $out 'manual-feedback-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Manual feedback tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'manual_revision_tests.cpp') '-o' (Join-Path $out 'manual-revision-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Manual revision compilation failed.' }
 & (Join-Path $out 'manual-revision-tests.exe')
@@ -49,6 +61,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Enemy tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Boss test compilation failed.' }
 & (Join-Path $out 'boss-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Boss tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'coffee_tests.cpp') '-o' (Join-Path $out 'coffee-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Coffee test compilation failed.' }
+& (Join-Path $out 'coffee-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Coffee tests failed.' }
 & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot 'core_tests.cpp') '-o' (Join-Path $out 'core-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Core test compilation failed.' }
 & (Join-Path $out 'core-tests.exe')
@@ -65,6 +81,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Expedition tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Progression test compilation failed.' }
 & (Join-Path $out 'progression-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Progression tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'reward_tests.cpp') '-o' (Join-Path $out 'reward-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Reward test compilation failed.' }
+& (Join-Path $out 'reward-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Reward tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'support_tests.cpp') '-o' (Join-Path $out 'support-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Support test compilation failed.' }
 & (Join-Path $out 'support-tests.exe')

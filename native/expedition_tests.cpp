@@ -12,6 +12,7 @@ void tick(Session& s, float seconds, Input input = {}) {
 }
 void offer(Session& s, Upgrade type) {
   s.expedition.rewards.push_back({1, {type, Upgrade::Hull, Upgrade::Mining}});
+  s.expedition.rewards.back().rarities[0] = s.expedition.effectiveRarity(type, Rarity::Uncommon);
   s.terminalOpen = true;
 }
 int main() {
@@ -260,7 +261,22 @@ int main() {
     {
       Session s(true, true);
       s.start(Gun::Pulse);
-      tick(s, 60.5f);
+      require(s.world.active.empty(), "Expedition starts with an immediate nearby pack");
+      std::array<bool, MAX_FOES> seen{};
+      for (int frame = 0; frame < 60 * 60; ++frame) {
+        s.step(1.f / 60);
+        for (int id : s.world.active) {
+          if (seen[id]) continue;
+          seen[id] = true;
+          const auto& foe = s.world.foes[id];
+          float radius = std::hypot(foe.x, foe.z);
+          require(radius >= Frontier::SPAWN_MIN - .001f && radius <= Frontier::SPAWN_MAX + .001f,
+                  "Natural opening enemy spawned inside the frontier ring");
+        }
+      }
+      require(s.world.active.size() > 1 && s.expedition.hp == s.expedition.maxHp,
+              "Opening does not allow a gradual approach before reaching the core");
+      tick(s, .5f);
       require(s.expedition.shipments == 1 && s.expedition.rewards.size() == 1 &&
                   s.expedition.hp > s.expedition.maxHp * .5f,
               "First natural payout is unreachable");

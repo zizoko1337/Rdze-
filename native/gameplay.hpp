@@ -1,5 +1,6 @@
 #pragma once
 #include "simulation.hpp"
+#include "ground_marks.hpp"
 #include <functional>
 #include <string>
 
@@ -71,73 +72,73 @@ inline constexpr WeaponInfo WEAPONS[] = {
     {"Laser",
      "PRECYZYJNY IMPULS",
      "Pewne trafienie. Obracana głowica i puls emitera.",
-     65,
-     .42f,
-     30,
+     80,
+     .4f,
+     40,
      5,
      {1, .13f, .2f}},
     {"Minigun",
      "OGIEŃ ZAPOROWY",
      "Rozkręcany bęben sześciu luf. Krótkie, gęste serie.",
-     54,
-     .065f,
-     8,
+     55,
+     .08f,
+     12,
      4.8f,
      {1, .69f, .22f}},
     {"Tesla",
      "WYŁADOWANIE OBSZAROWE",
-     "Pioruny trafiają wszystkich w zasięgu. Długie odnowienie.",
-     55,
-     5.5f,
-     145,
+     "Kontroluje hordy. Elity otrzymują 35%, bossowie 10% obrażeń.",
+     60,
+     1.8f,
+     160,
      7,
      {.4f, .65f, 1}},
     {"Snajper",
      "DALEKI ZASIĘG",
-     "Ciężki strzał, odrzut lufy i powolny powrót zamka.",
-     180,
+     "Ciężki strzał. Priorytet: boss, elita, zwykły przeciwnik.",
+     210,
      3.5f,
-     380,
+     1000,
      6,
      {.65f, .95f, 1}},
     {"Lanca",
      "ŁADOWANY LASER CIĄGŁY",
-     "Ładuje 6 s, potem utrzymuje wiązkę przez 3 s.",
-     110,
+     "6 s ładowania, 3 s wiązki, 2 s chłodzenia. Powolny obrót. Priorytet bossów.",
+     130,
      2,
-     185,
+     1650,
      6.5f,
      {1, .3f, .08f}},
     {"Toksyna",
      "TRUCIZNA / OBSZAR",
-     "Pociski tworzą chmury. Zatrucie działa przez 6 s.",
-     78,
-     1.6f,
-     18,
+     "Słabe trafienie, kumulowane zatrucie i 35% spowolnienia. Chmura nie mnoży stosów.",
+     85,
+     1.8f,
+     8,
      5,
      {.45f, 1, .12f}},
     {"Rakiety",
      "NAPROWADZANIE",
-     "Ruchoma wyrzutnia. Rakiety wybuchają w promieniu 10 m.",
+     "Mały wybuch 4 m. Bossowie otrzymują 55% obrażeń.",
      125,
-     1.35f,
-     140,
+     1.2f,
+     180,
      6,
      {1, .48f, .15f}},
     {"Moździerz",
      "OSTRZAŁ BALISTYCZNY",
      "Wysoki łuk lotu. Ciężka eksplozja w promieniu 16 m.",
-     170,
-     3.7f,
-     250,
+     180,
+     3.8f,
+     600,
      4.5f,
      {1, .78f, .4f}},
     {"Palnik",
      "STOŻEK OGNIA",
      "Ciągły płomień podpala wszystkich przed dyszą.",
-     38,
+     32,
      .1f,
-     72,
+     220,
      4.5f,
      {1, .24f, .025f}},
     {"Przekaźnik tempa",
@@ -190,6 +191,22 @@ struct Foe {
   float x = 0, z = 0, hp = 0, maxHp = 0, speed = 0, size = 0, altitude = 0, phase = 0;
   float poison = 0, poisonDps = 0, burn = 0, burnDps = 12, flash = 0, ability = 0, stun = 0;
   float toxicSlow = 0, glued = 0;
+  // Fixed expiry buckets: stacked tower venom costs no allocations or per-dose objects.
+  std::array<float, 13> towerPoisonBuckets{};
+  float towerPoisonDps = 0, towerToxicSlow = 0;
+  uint32_t towerPoisonEpoch = 0;
+  void expireTowerPoison(uint32_t now) {
+    if (now - towerPoisonEpoch >= towerPoisonBuckets.size()) {
+      towerPoisonBuckets.fill(0);
+      towerPoisonDps = 0;
+      towerPoisonEpoch = now;
+    }
+    while (towerPoisonEpoch < now) {
+      auto& bucket = towerPoisonBuckets[++towerPoisonEpoch % towerPoisonBuckets.size()];
+      towerPoisonDps = std::max(0.f, towerPoisonDps - bucket);
+      bucket = 0;
+    }
+  }
   float sabotage = 0, towerSearch = 0;
   uint32_t towerTarget = 0;
   Species type = Crawler;
@@ -212,6 +229,7 @@ struct Tower {
   float x = 0, z = 0, angle = 0, cooldown = 0, phase = 0, spin = 0, spinSpeed = 0, recoil = 0,
         pulse = 0, effectClock = 0, searchClock = 0;
   int target = -1, state = 0;
+  float beamPitch = 0;
   uint32_t generation = 0, id = 0;
   uint64_t shots = 0;
   float localRate = 1, localRange = 1;
@@ -316,6 +334,7 @@ public:
   std::vector<Particle> particles;
   std::vector<GasZone> gas;
   std::vector<RingFx> rings;
+  GroundMarks groundMarks;
   std::vector<FoeDeath> deaths;
   struct WormBody {
     int head;
@@ -340,6 +359,9 @@ public:
   int wave = 1, pending = 0, kills = 0, bossKills = 0, bossSerial = 0;
   bool autoWaves = true, paused = false;
   float towerDamage = 1, towerRate = 1, towerRange = 1;
+  std::array<float, WeaponCount> typeDamage{}, typeRate{}, typeRange{};
+  float damageScale(Weapon type) const { return towerDamage + typeDamage[type]; }
+  float rateScale(Weapon type) const { return towerRate + typeRate[type]; }
   bool frost = false;
   int focusTarget = -1;
   uint32_t focusGeneration = 0;
@@ -394,9 +416,9 @@ public:
     WeaponInfo info = WEAPONS[type];
     if (isSupport(type))
       return info;
-    info.damage *= towerDamage;
-    info.cooldown /= towerRate;
-    info.range *= towerRange;
+    info.damage *= damageScale(type);
+    info.cooldown /= rateScale(type);
+    info.range *= towerRange + typeRange[type];
     return info;
   }
   WeaponInfo weaponInfo(const Tower& tower) const {
@@ -477,6 +499,36 @@ public:
     float dx = e.x - t.x, dz = e.z - t.z;
     float range = weaponInfo(t).range;
     return dx * dx + dz * dz <= range * range;
+  }
+  static bool priorityWeapon(Weapon type) { return type == Sniper || type == Lance; }
+  static int targetPriority(const Foe& e) { return e.type >= Titan ? 2 : e.elite ? 1 : 0; }
+  static float turnSpeed(Weapon type) {
+    return type == Laser ? 10.f : type == Minigun ? 3.f : type == Lance ? .25f :
+           type == Sniper ? 1.4f : 5.f;
+  }
+  int priorityTarget(const Tower& t, float range) const {
+    int best = inRange(t) ? t.target : -1;
+    int priority = best < 0 ? -1 : targetPriority(foes[best]);
+    float nearest = best < 0 ? 1e30f : std::hypot(foes[best].x - t.x, foes[best].z - t.z);
+    grid.radius(t.x, t.z, range, foes, [&](int id) {
+      int rank = targetPriority(foes[id]);
+      float distance = std::hypot(foes[id].x - t.x, foes[id].z - t.z);
+      if (rank > priority || (rank == priority && best != t.target && distance < nearest)) {
+        best = id;
+        priority = rank;
+        nearest = distance;
+      }
+    });
+    return best;
+  }
+  void addTowerPoison(int id, float dps) {
+    auto& e = foes[id];
+    if (e.hp <= 0 || dps <= 0) return;
+    uint32_t now = uint32_t(time * 2);
+    e.expireTowerPoison(now);
+    e.towerPoisonBuckets[(now + 13) % 13] += dps;
+    e.towerPoisonDps += dps;
+    e.towerToxicSlow = std::max(e.towerToxicSlow, 6.f);
   }
   int spawn(Species species, float x, float z, uint32_t family = 0, uint8_t slimeStage = 0,
             float inheritedHp = 0) {
@@ -677,14 +729,16 @@ public:
         fn(body.head, nearest);
     }
   }
-  void blast(Vec3 p, float radius, float damage, Weapon type) {
+  float blast(Vec3 p, float radius, float damage, Weapon type, float bossScale = 1, bool weaponCredit = true) {
+    float total = 0;
     blastTargets(p, radius, [&](int i, float d) {
-      hurt(i, damage * (1 - .45f * d / radius), type);
+      total += hurt(i, damage * (1 - .45f * d / radius) * (foes[i].type >= Titan ? bossScale : 1), type, weaponCredit);
     });
     auto color = WEAPONS[type].color;
     ring({p.x, .2f, p.z}, color, radius, .7f);
     sparks(p, color, type == Mortar ? 30 : 16, 22);
     particle(p, {0, 2, 0}, color, radius * .7f, .4f);
+    return total;
   }
   void launch(Tower& t) {
     if (shots.size() >= MAX_SHOTS)
@@ -698,7 +752,7 @@ public:
     p.generation = t.generation;
     p.endpoint = targetPoint(t.target);
     p.damage = w.damage;
-    p.radius = t.type == Mortar ? 16 : t.type == Rocket ? 10 : 9;
+    p.radius = t.type == Mortar ? 16 : t.type == Rocket ? 4 : 9;
     p.speed = t.type == Rocket ? 55 : 30;
     p.duration = t.type == Mortar ? 1.3f + length(p.endpoint - origin) / 65 : 1;
     shots.push_back(p);
@@ -749,26 +803,38 @@ public:
     t.pulse = std::max(0.f, t.pulse - dt * 2);
     t.effectClock -= dt;
     t.searchClock -= dt;
+    if (t.type == Lance && t.state == 1 && t.target >= 0 && !inRange(t))
+      t.searchClock = 0;
+    bool focused = false;
     if (focusTime > 0 && valid(focusTarget, focusGeneration)) {
       const auto& e = foes[focusTarget];
       if (std::hypot(e.x - t.x, e.z - t.z) <= w.range) {
         t.target = focusTarget;
         t.generation = focusGeneration;
+        focused = true;
       }
+    }
+    if (!focused && priorityWeapon(t.type) && t.searchClock <= 0) {
+      t.target = priorityTarget(t, w.range);
+      t.generation = t.target >= 0 ? foes[t.target].generation : 0;
+      t.searchClock = .15f;
     }
     if (!inRange(t)) {
       t.target = -1;
       if (t.searchClock <= 0) {
-        t.target = grid.nearest(t.x, t.z, w.range, foes);
+        t.target = priorityWeapon(t.type) ? priorityTarget(t, w.range) : grid.nearest(t.x, t.z, w.range, foes);
         t.generation = t.target >= 0 ? foes[t.target].generation : 0;
         t.searchClock = .08f;
       }
     }
     bool ready = inRange(t);
+    bool aligned = false;
     if (ready) {
       float a = std::atan2(foes[t.target].x - t.x, foes[t.target].z - t.z);
       float delta = std::atan2(std::sin(a - t.angle), std::cos(a - t.angle));
-      t.angle += delta * std::min(1.f, dt * (t.type == Sniper ? 4.f : 10.f));
+      float rotation = turnSpeed(t.type) * dt;
+      t.angle += std::clamp(delta, -rotation, rotation);
+      aligned = std::abs(delta) <= rotation + .10f;
     }
     float desired = ready ? (t.type == Minigun ? 32.f : 4.f) : .35f;
     t.spinSpeed += (desired - t.spinSpeed) * std::min(1.f, dt * 3);
@@ -777,7 +843,7 @@ public:
     if (t.type == Lance) {
       if (t.state == 0) {
         if (ready)
-          t.phase = std::min(6.f, t.phase + dt * towerRate * t.localRate *
+          t.phase = std::min(6.f, t.phase + dt * rateScale(t.type) * t.localRate *
                                                 (t.amplifiedUntil > time ? 2.f : 1.f));
         if (t.phase >= 6 && ready) {
           t.state = 1;
@@ -786,19 +852,29 @@ public:
           ++t.shots;
         }
       } else if (t.state == 1) {
-        t.phase -= dt;
-        if (ready) {
-          Vec3 end = targetPoint(t.target);
-          hurt(t.target, w.damage * dt, Lance);
-          t.pulse = 1;
-          if (t.effectClock <= 0) {
-            beam(muzzle, end, w.color, .65f, .075f);
-            beam(muzzle, end, {1, .86f, .55f}, .18f, .075f);
-            sparks(end, w.color, 2, 8);
-            t.effectClock = .04f;
-          }
+        float activeDt = std::min(dt, t.phase);
+        t.phase = std::max(0.f, t.phase - dt);
+        t.pulse = 1;
+        Vec3 end;
+        if (ready && aligned) {
+          end = targetPoint(t.target);
+          Vec3 delta = end - muzzle;
+          t.beamPitch = std::atan2(delta.y, std::hypot(delta.x, delta.z));
+          hurt(t.target, w.damage * activeDt, Lance);
+        } else {
+          float cp = std::cos(t.beamPitch);
+          end = muzzle + Vec3{std::sin(t.angle) * cp, std::sin(t.beamPitch),
+                              std::cos(t.angle) * cp} * w.range;
         }
-        if (t.phase <= 0) {
+        // A discharge runs to completion, including empty space and retargeting turns.
+        if (t.effectClock <= 0) {
+          beam(muzzle, end, w.color, .65f, .075f);
+          beam(muzzle, end, {1, .86f, .55f}, .18f, .075f);
+          if (ready && aligned)
+            sparks(end, w.color, 2, 8);
+          t.effectClock = .04f;
+        }
+        if (t.phase <= .00001f) {
           t.state = 2;
           t.phase = w.cooldown;
         }
@@ -821,7 +897,7 @@ public:
           float ex = e.x - t.x, ez = e.z - t.z, d = std::hypot(ex, ez);
           if (d < .001f || (ex * dx + ez * dz) / d > .78f) {
             e.burn = 3;
-            e.burnDps = 12 * towerDamage;
+            e.burnDps = 20 * damageScale(t.type);
             hurt(i, w.damage * .1f, Flame);
           }
         });
@@ -842,7 +918,7 @@ public:
       }
       return;
     }
-    if (!ready || t.cooldown > 0)
+    if (!ready || t.cooldown > 0 || (t.type != Tesla && !aligned))
       return;
     if (t.type == Minigun && t.spinSpeed < 13)
       return;
@@ -854,7 +930,10 @@ public:
     if (t.type == Tesla) {
       grid.radius(t.x, t.z, w.range, foes, [&](int i) {
         lightning({t.x, w.height + 1, t.z}, targetPoint(i), i);
-        hurt(i, w.damage, Tesla);
+        float multiplier = foes[i].type >= Titan ? .10f : foes[i].elite ? .35f : 1.f;
+        hurt(i, w.damage * multiplier, Tesla);
+        if (foes[i].type < Titan && !foes[i].elite)
+          foes[i].stun = std::max(foes[i].stun, .15f);
       });
       ring({t.x, .15f, t.z}, w.color, w.range, .55f);
       return;
@@ -900,15 +979,14 @@ public:
       if (impact || p.age > 12) {
         if (p.type == Venom) {
           if (gas.size() < 512)
-            gas.push_back({p.pos.x, p.pos.z, 9, 7, 0, 22 * p.damage / WEAPONS[Venom].damage});
+            gas.push_back({p.pos.x, p.pos.z, 9, 7, 0, 32 * p.damage / WEAPONS[Venom].damage});
           grid.radius(p.pos.x, p.pos.z, 9, foes, [&](int j) {
-            foes[j].poison = 6;
-            foes[j].poisonDps = std::max(foes[j].poisonDps, 22 * p.damage / WEAPONS[Venom].damage);
+            addTowerPoison(j, 32 * p.damage / WEAPONS[Venom].damage);
             hurt(j, p.damage, Venom);
           });
           ring({p.pos.x, .1f, p.pos.z}, WEAPONS[Venom].color, 9, .7f);
         } else
-          blast(p.pos, p.radius, p.damage, p.type);
+          blast(p.pos, p.radius, p.damage, p.type, p.type == Rocket ? .55f : 1.f);
         shots[i] = shots.back();
         shots.pop_back();
       } else
@@ -945,7 +1023,7 @@ public:
     float dx = target->x - e.x, dz = target->z - e.z, distance = std::hypot(dx, dz);
     if (distance > 4.05f) {
       e.sabotage = 0;
-      float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : 1.f);
+      float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : e.towerToxicSlow > 0 ? .65f : 1.f);
       float amount = e.glued > 0 ? 0 : std::min(distance - 4, e.speed * slow * dt);
       Vec3 next{e.x + dx / distance * amount, 0, e.z + dz / distance * amount};
       // Slide around the core instead of walking through its cylinder.
@@ -1051,6 +1129,7 @@ public:
       return;
     dt = std::min(dt, .1f);
     time += dt;
+    groundMarks.tick(dt);
     bool supportDirty = false;
     for (auto& tower : towers)
       if (tower.disabledUntil > 0 && tower.disabledUntil <= time) {
@@ -1088,6 +1167,7 @@ public:
       e.flash = std::max(0.f, e.flash - dt);
       bool stunned = e.stun > 0;
       e.toxicSlow = std::max(0.f, e.toxicSlow - dt);
+      e.towerToxicSlow = std::max(0.f, e.towerToxicSlow - dt);
       e.glued = std::max(0.f, e.glued - dt);
       e.stun = std::max(0.f, e.stun - dt);
       if (!stunned)
@@ -1096,6 +1176,10 @@ public:
         float tick = std::min(e.poison, dt);
         e.poison -= tick;
         hurt(i, (e.poisonDps + (e.type >= Titan ? 100.f : 20.f)) * tick, Venom);
+      }
+      if (e.towerPoisonDps > 0) {
+        e.expireTowerPoison(uint32_t(time * 2));
+        hurt(i, e.towerPoisonDps * dt, Venom);
       }
       if (e.burn > 0) {
         float tick = std::min(e.burn, dt);
@@ -1122,7 +1206,7 @@ public:
       if (e.type == SiegeSpitter || e.type == SiegeBoss)
         stop = SIEGE_RANGE;
       if (distance > stop) {
-        float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : 1.f);
+        float slow = movementSlowAt(e.x, e.z) * (e.toxicSlow > 0 ? .5f : e.towerToxicSlow > 0 ? .65f : 1.f);
         float amount = e.glued > 0 || e.absorbClock > 0
                            ? 0 : std::min(distance - stop, e.speed * slow * dt);
         if (e.type == Wyrm) {
@@ -1210,8 +1294,9 @@ public:
       g.tick -= dt;
       if (g.tick <= 0) {
         grid.radius(g.x, g.z, g.radius, foes, [&](int j) {
-          foes[j].poison = 6;
-          foes[j].poisonDps = std::max(foes[j].poisonDps, g.poisonDps);
+          foes[j].towerToxicSlow = std::max(foes[j].towerToxicSlow, .4f);
+          if (foes[j].towerPoisonDps <= 0)
+            addTowerPoison(j, g.poisonDps);
         });
         g.tick = .25f;
       }
