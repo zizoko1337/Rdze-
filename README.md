@@ -6,6 +6,8 @@ Natywny prototyp na Windows, C++20 + SDL3 + Direct3D 11. Świat 3D i przeciwnicy
 
 Repozytorium zawiera kod, grafiki i skrypty budowania. Gotowy `Rdzen.exe` oraz `Rdzen-prototyp.zip` są dołączane do wydań w zakładce **Releases**; pliki wykonywalne, lokalne kompilatory i wyniki testów nie trafiają do historii Git.
 
+Po `git pull` uruchom **START.bat**: sprawdza zawartość źródeł i lokalnej kompilacji, a po zmianach automatycznie przebudowuje grę. Sam `git pull` nie aktualizuje istniejącego przenośnego `Rdzen.exe`. Aby odświeżyć również ten plik i ZIP, uruchom **ZROB_EXE.bat**.
+
 Na drugim laptopie z Windows 10/11 x64 możesz pobrać samo EXE z Releases i uruchomić je dwuklikiem. Do dalszego programowania sklonuj repozytorium przez **Code → Clone**, a następnie uruchom **ZROB_EXE.bat**. Pierwsza kompilacja pobierze lokalnie kompilator i SDL z oficjalnych wydań GitHub oraz zweryfikuje ich SHA256. Nie trzeba instalować Unity, Godota ani Node.js do natywnej wersji gry. Pierwsze budowanie wymaga internetu; uruchamianie gotowej gry działa offline.
 
 Jeśli używasz tego samego konta GitHub, na drugim komputerze wystarczy klonowanie. **Fork** tworzy osobne repozytorium na innym koncie; również można je potem sklonować. Starsza wersja przeglądarkowa jest zachowana w `src/`, lecz główna wersja gry znajduje się w `native/`.
@@ -50,7 +52,7 @@ Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy ws
 | Impulsy kriogeniczne | Spowolnienie narasta wraz ze zbliżaniem się bestii do rdzenia, w promieniu 85 m |
 | Wspólny cel | Manualne trafienie oznacza cel na 3 s; wieżyczki w zasięgu przełączają na niego ostrzał. Cel otrzymuje +0/10/20/30/40% obrażeń zależnie od rzadkości |
 | Awaryjne oczyszczenie | Raz na ekspedycję, przy 50% HP: zabija zwykłe bestie i zadaje bossom 50% ich maksymalnego HP |
-| Fabryka jeździków | Uruchamia produkcję 5 maszyn co 12 s; jeździk szuka najbliższego celu i wybucha w promieniu 4 m, za 180 obrażeń w centrum (mniej bossom) |
+| Fabryka jeździków | 6 dronów dostarcza 6 fabryczek; po podłączeniu produkcja 6 maszyn co 12 s; jeździk szuka najbliższego celu i wybucha w promieniu 4 m, za 180 obrażeń w centrum (mniej bossom) |
 | Punkt usług (tylko Rare) | +1 punkt do wydania przy prawym komputerze na jedną z trzech jednorazowych usług |
 | Większa seria / szybsza linia | +1/2/3/4/5 jeździków na serię albo +10/20/30/40/50% bazowego tempa produkcji, zgodnie z rzadkością karty |
 
@@ -193,3 +195,5 @@ Pięć kaw daje 5 / 6 / 7 / 8 / 10 minut czujności. Karty Common / Rare / Epic 
 Propozycja kolejnych etapów: [karty, balans pierwszych ekspedycji, osiągnięcia i planety](PLAN_ROZWOJU.md).
 
 Globalne obrażenia, tempo i zasięg mają osobne limity po 5 wyborów. Każdy typ bojowej wieżyczki ma dodatkowo trzy ścieżki rozwoju kolejno Common → Uncommon → Rare → Epic → Legendary. Karty budowy mają stałe rzadkości, a oferta ma minimum 40% szansy na bojową wieżyczkę (60% dla uranu przed 10 min). [Aktualne zasady, wartości premii i losowanie](ULEPSZENIA_WIEZYCZEK.md).
+
+Rdzeń blokuje ostrzał wieżyczek poza moździerzem. Nowa dostawa fabryczek, rozdział serii i grafika: [JEZDZIX_POL.md](JEZDZIX_POL.md). Test graficzny: TEST_FABRYK.bat.

@@ -30,7 +30,7 @@ inline constexpr const char* ENEMY_BEHAVIOR[] = {
     "Do rdzenia 3,2 m/s. Szeroki, szybki zygzak. Głowa i 8 segmentów, wspólne HP.",
     "8000 -> 2 x 4000 -> 4 x 2000 HP. Razem 24000. Kryształ po całym podziale.",
     "Przy 75/50/25% HP raz wchłania obecnych wrogów do 50 m i ich pozostałe HP.",
-    "Zasięg 63 m. Kwas: 200 obrażeń co 5 s + czas lotu."};
+    "Zasięg 63 m. Ciągły rozpylacz kwasu z trąby: 40 obrażeń/s."};
 static_assert(std::size(ENEMY_ROLES) == SpeciesCount && std::size(ENEMY_BEHAVIOR) == SpeciesCount);
 
 // No renderer dependency in spawn logic, allowing the actual menu action to be tested headlessly.

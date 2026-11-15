@@ -12,6 +12,7 @@
 #include "coffee_scene.hpp"
 #include "coffee_effects.hpp"
 #include "coffee_visual_test.hpp"
+#include "factory_visual_test.hpp"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -33,6 +34,7 @@ inline int run(int argc, char** argv) {
   bool legendsTest = false;
   bool bossTest = false;
   bool coffeeTest = false;
+  bool factoryTest = false;
   for (int i = 1; i < argc; ++i) {
     test |= std::string(argv[i]) == "--command-test";
     testMini |= std::string(argv[i]) == "--minigun";
@@ -55,6 +57,7 @@ inline int run(int argc, char** argv) {
     legendsTest |= std::string(argv[i]) == "--legends-test";
     bossTest |= std::string(argv[i]) == "--boss-test";
     coffeeTest |= std::string(argv[i]) == "--coffee-test";
+    factoryTest |= std::string(argv[i]) == "--factory-test";
   }
   plasmaTest |= coolingTest;
   revisionTest |= legendsTest;
@@ -63,10 +66,10 @@ inline int run(int argc, char** argv) {
   deliveryTest |= upgradeTest;
   progressionTest |= deliveryTest;
   test |= progressionTest || frontierTest || servicesTest || manualTest || radioTest ||
-          plasmaTest || enemyTest || coreTest || bossTest || coffeeTest;
+          plasmaTest || enemyTest || coreTest || bossTest || coffeeTest || factoryTest;
   progressionLab |= frontierLab;
   const bool liveExpedition = !test || progressionTest || frontierTest || servicesTest ||
-                              radioTest || plasmaTest || enemyTest || coreTest || coffeeTest;
+                              radioTest || plasmaTest || enemyTest || coreTest || coffeeTest || factoryTest;
   try {
     check(CoInitializeEx(nullptr, COINIT_MULTITHREADED), "COM initialization");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
@@ -79,7 +82,8 @@ inline int run(int argc, char** argv) {
     } runtime;
     auto root = std::filesystem::current_path(), assets = root / "public" / "assets";
     auto artifacts = root / "artifacts" / "command" /
-                     (coffeeTest     ? "coffee"
+                     (factoryTest    ? "factories"
+                      : coffeeTest  ? "coffee"
                       : bossTest     ? "bosses"
                       : legendsTest ? "manual-legends"
                       : revisionTest ? "manual-revision"
@@ -120,6 +124,7 @@ inline int run(int argc, char** argv) {
     CoffeeVisualTest coffeeVisual;
     UpgradeLab upgradeLab;
     Bestiary bestiary;
+    FactoryVisualTest factoryVisual;
     bool bestiaryPausePass = false, bestiarySpawnPass = false, enemyResumePass = false;
     float bestiaryFrozenTime = 0;
     bool coreRegenPass = false, coreLabPass = false, corePausePass = false;
@@ -370,6 +375,9 @@ inline int run(int argc, char** argv) {
       double wall = std::chrono::duration<double>(now - begin).count();
       if (coffeeTest)
         coffeeVisual.step(*session, wall, key, launch, window.get(), capture, running);
+      if (factoryTest)
+        factoryVisual.step(*session, wall, [&](SDL_Scancode code) { key(code); }, launch,
+                           capture, running);
       if (bossTest) {
         constexpr Species kinds[] = {Wyrm, Slime, Devourer, SiegeBoss};
         if (stage == 0 && wall > .3) {
@@ -438,6 +446,9 @@ inline int run(int argc, char** argv) {
           } else if (bossVisualFrame == 4 && elapsed > 3.5f) {
             capture = "bosses-" + std::to_string(bossIndex + 2) + "-late.png";
             bossVisualFrame = 5;
+          } else if (bossVisualFrame == 5 && kinds[bossIndex] == SiegeBoss && elapsed > 5) {
+            capture = "bosses-5-platform.png";
+            bossVisualFrame = 6;
           }
           if (elapsed > 7.2f) {
             int alive = 0;
@@ -888,7 +899,7 @@ inline int run(int argc, char** argv) {
           running = false;
       }
       if (test && !progressionTest && !frontierTest && !servicesTest && !manualTest && !radioTest &&
-          !plasmaTest && !enemyTest && !coreTest && !bossTest && !coffeeTest) {
+          !plasmaTest && !enemyTest && !coreTest && !bossTest && !coffeeTest && !factoryTest) {
         if (stage == 9 && wall - stageAt > .15 && !roofShot) {
           capture = "06-round-roof.png";
           roofShot = true;
@@ -1186,7 +1197,7 @@ inline int run(int argc, char** argv) {
           stage = 8;
           stageAt = wall;
         } else if (stage == 8 && !session->terminalOpen && wall - stageAt > .15) {
-          factoryPass &= session->expedition.roverBatch == 9;
+          factoryPass &= session->expedition.roverBatch == 10;
           capture = "frontier-02-rover.png";
           for (int id : session->world.active)
             if (session->world.foes[id].type == Titan)
@@ -1304,7 +1315,7 @@ inline int run(int argc, char** argv) {
           stage = 24;
           running = false;
         }
-        if (wall > 65)
+        if (wall > 65 + RoverFactories::READY_AT)
           running = false;
       }
       if (progressionTest) {
@@ -1897,6 +1908,26 @@ inline int run(int argc, char** argv) {
         const auto& foe = session->world.foes[fixture];
         camera.eye = {foe.x + 42, 42, foe.z - 40};
         camera.target = {foe.x, 6, foe.z + (foe.type == Wyrm ? 18.f : 0.f)};
+        if (capture == "bosses-5-platform.png") {
+          camera.eye = {0, CORE_HEIGHT + 12, 0};
+          camera.target = {foe.x, foe.size * .5f, foe.z};
+        }
+      }
+      if (factoryTest && !capture.empty()) {
+        camera.eye = {-40, 43, -44};
+        camera.target = {0, 5, 0};
+        if (capture == "factories-01-inbound.png") {
+          camera.eye = {-185, 160, -200};
+          camera.target = {0, 45, 0};
+        }
+        if (capture == "factories-01b-approach.png") {
+          camera.eye = {-70, 65, -75};
+          camera.target = {0, 20, 0};
+        }
+        if (capture == "factories-05-ready.png") {
+          camera.eye = {-15, 7, 25};
+          camera.target = {-8.8f, 2, 15.24f};
+        }
       }
       Vec3 shake = session->criticalShake();
       if (session->mode == Mode::Mounted && !session->tactical && capture.empty() && !help &&
@@ -1962,6 +1993,19 @@ inline int run(int argc, char** argv) {
       }
     }
     release();
+    if (factoryTest) {
+      std::ofstream report(artifacts / "factories-result.json");
+      report << "{\n  \"passed\": " << (factoryVisual.complete ? "true" : "false")
+             << ",\n  \"stage\": " << factoryVisual.stage
+             << ",\n  \"delivery_age\": " << session->frontier.factories.age
+             << ",\n  \"simulation_time\": " << session->world.time
+             << ",\n  \"blocked\": " << (session->blocked() ? "true" : "false")
+             << ",\n  \"six_deliveries\": " << (session->frontier.factories.ready() ? "true" : "false")
+             << ",\n  \"balanced_ten\": " << (session->frontier.roversMade == 16 ? "true" : "false")
+             << ",\n  \"pause_verified\": " << (factoryVisual.pauseVerified ? "true" : "false") << "\n}\n";
+      std::cout << (factoryVisual.complete ? "PASS" : "FAIL") << " FACTORY APPLICATION TEST\n";
+      return factoryVisual.complete ? 0 : 1;
+    }
     if (coffeeTest) {
       bool pass = coffeeVisual.complete;
       std::ofstream report(artifacts / "coffee-result.json");

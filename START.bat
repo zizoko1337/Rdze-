@@ -3,12 +3,7 @@ setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
 title RDZEN - Centrum dowodzenia
-if not exist "native\build\rdzen-game.exe" (
-  echo Przygotowywanie natywnej gry...
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File native\build.ps1 -GameOnly
-  if errorlevel 1 goto :failed
-)
-"native\build\rdzen-game.exe" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File native\start.ps1 %*
 if errorlevel 1 goto :failed
 exit /b 0
 :failed

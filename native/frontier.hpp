@@ -1,5 +1,6 @@
 #pragma once
 #include "expedition.hpp"
+#include "rover_factories.hpp"
 
 namespace command {
 enum class CrystalState { Ground, Queued, Carried };
@@ -15,6 +16,7 @@ struct Rover {
   uint32_t generation = 0;
   float searchClock = 0, life = 60;
   uint32_t serial = 0;
+  uint8_t factory = 255;
 };
 enum class CollectorState { Idle, Outbound, Collecting, Inbound };
 struct Frontier {
@@ -23,6 +25,7 @@ struct Frontier {
   static constexpr float ROVER_DAMAGE = WEAPONS[Rocket].damage, ROVER_RADIUS = 4, ROVER_SPEED = 24;
   static constexpr Vec3 COLLECTOR_DOCK{-21, 7, -6};
   std::vector<Rover> rovers;
+  RoverFactories factories;
   // Aggregate nearby traffic instead of checking every pair of cars.
   struct TrafficCell {
     int x = 0, z = 0, count = 0;
@@ -200,8 +203,8 @@ struct Frontier {
     return SPECIES[type].hp * scale * (elite && type != Saboteur ? 4 : 1);
   }
   static float spawnSpeed(Species type, float time, bool elite = false) {
-    constexpr float speeds[] = {3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f,
-                                WYRM_FORWARD_SPEED, 2.8f, 3, 2.8f};
+    constexpr float speeds[] = {
+        3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f, WYRM_FORWARD_SPEED, 2.8f, 3, 2.8f};
     static_assert(std::size(speeds) == SpeciesCount);
     return (speeds[type] + (type <= Runner ? std::min(time / 120, 4.f) : 0)) *
            (elite && type != Saboteur ? .9f : 1.f);
@@ -246,10 +249,11 @@ struct Frontier {
       int id = g.boss();
       if (id >= 0) {
         auto& boss = g.foes[id];
-        boss.hp = boss.maxHp = boss.type >= Wyrm ? SPECIES[boss.type].hp : (boss.type == Titan   ? 7000.f
-                                : boss.type == Brain ? 8000.f
-                                                     : 6000.f) +
-                               bossesSpawned * 1500;
+        boss.hp = boss.maxHp = boss.type >= Wyrm ? SPECIES[boss.type].hp
+                                                 : (boss.type == Titan   ? 7000.f
+                                                    : boss.type == Brain ? 8000.f
+                                                                         : 6000.f) +
+                                                       bossesSpawned * 1500;
         boss.speed = spawnSpeed(boss.type, g.time);
         ++spawned[boss.type];
         ++bossesSpawned;
@@ -273,7 +277,8 @@ struct Frontier {
       spawnTimer = interval * (respite ? 3 : 1);
       int group = respite ? 1 : 1 + std::min(7, int(g.time / 240));
       for (int i = 0; i < group && g.active.size() < MAX_ACTIVE; ++i) {
-        float a = g.random.unit() * 2 * PI, r = SPAWN_MIN + g.random.unit() * (SPAWN_MAX - SPAWN_MIN);
+        float a = g.random.unit() * 2 * PI,
+              r = SPAWN_MIN + g.random.unit() * (SPAWN_MAX - SPAWN_MIN);
         spawnFoe(g, waveSpecies(g), std::sin(a) * r, std::cos(a) * r);
       }
       added = true;
@@ -303,17 +308,33 @@ struct Frontier {
   }
   void stepRovers(Game& g, const Expedition& e, float dt) {
     if (e.levels[size_t(Upgrade::RoverFactory)] > 0) {
-      productionClock -= dt;
-      if (productionClock <= 0) {
-        productionClock = std::max(-dt, productionClock) + e.roverInterval();
-        for (int i = 0; i < e.roverBatch && rovers.size() < MAX_ROVERS; ++i) {
-          uint32_t serial = uint32_t(roversMade++);
-          float a = float(serial % 65536) * 2.399963f;
-          float radius = CORE_RADIUS + 3 + float(serial % 3) * 1.1f;
-          Rover rover{{std::sin(a) * radius, .4f, std::cos(a) * radius}};
-          rover.serial = serial;
-          rover.searchClock = float(serial % 12) / 60;
-          rovers.push_back(rover);
+      if (!factories.active)
+        factories.initialize(g.random.state ^ uint32_t(g.time * 1000));
+      factories.advance(dt);
+      if (factories.ready()) {
+        productionClock -= dt;
+        if (productionClock <= 0) {
+          productionClock = std::max(-dt, productionClock) + e.roverInterval();
+          factories.allocate(e.roverBatch,
+                             MAX_ROVERS - int(rovers.size()) - factories.queuedCount());
+        }
+        factories.releaseClock -= dt;
+        if (factories.releaseClock <= 0 && factories.queuedCount() > 0) {
+          factories.releaseClock =
+              std::max(-dt, factories.releaseClock) + RoverFactories::RELEASE_INTERVAL;
+          for (int port = 0; port < RoverFactories::COUNT && rovers.size() < MAX_ROVERS; ++port) {
+            if (!factories.queued[port])
+              continue;
+            uint32_t serial = uint32_t(roversMade++);
+            Rover rover{RoverFactories::exit(port)};
+            rover.serial = serial;
+            rover.factory = uint8_t(port);
+            rover.searchClock = float(serial % 12) / 60;
+            rovers.push_back(rover);
+            --factories.queued[port];
+            ++factories.produced[port];
+            factories.doorPulse[port] = .35f;
+          }
         }
       }
     }

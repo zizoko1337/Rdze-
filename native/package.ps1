@@ -1,8 +1,11 @@
 param([switch]$Rebuild, [string]$GameExecutable)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'source_state.ps1')
+$customGameExecutable = [bool]$GameExecutable
 if (!$GameExecutable) { $GameExecutable = Join-Path $PSScriptRoot 'build/rdzen-game.exe' }
-if ($Rebuild -or !(Test-Path -LiteralPath $GameExecutable)) {
+if ($Rebuild -or !(Test-Path -LiteralPath $GameExecutable) -or
+    (!$customGameExecutable -and !(Test-GameBuildCurrent $PSScriptRoot))) {
   & (Join-Path $PSScriptRoot 'build.ps1') -GameOnly
 }
 $GameExecutable = (Resolve-Path -LiteralPath $GameExecutable).Path

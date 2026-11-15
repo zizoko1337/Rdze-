@@ -1,13 +1,16 @@
 #include "command_game.hpp"
+#include "enemy_spray.hpp"
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 using namespace command;
 void require(bool value, const char* message) {
-  if (!value) throw std::runtime_error(message);
+  if (!value)
+    throw std::runtime_error(message);
 }
 void tick(Game& g, float seconds) {
-  for (int i = 0; i < int(std::round(seconds * 60)); ++i) g.step(1.f / 60);
+  for (int i = 0; i < int(std::round(seconds * 60)); ++i)
+    g.step(1.f / 60);
 }
 int main() {
   try {
@@ -24,14 +27,19 @@ int main() {
       for (;;) {
         int target = -1;
         for (int id : g.active)
-          if (g.foes[id].type == Slime && g.foes[id].hp > 0) {target = id; break;}
-        if (target < 0) break;
+          if (g.foes[id].type == Slime && g.foes[id].hp > 0) {
+            target = id;
+            break;
+          }
+        if (target < 0)
+          break;
         auto old = g.foes[target];
         total += old.hp;
         g.hurt(target, old.hp, Laser);
         ++killed;
         frontier.processDeaths(g);
-        require(frontier.crystals.size() == (killed == 7 ? 1u : 0u), "Slime loot before final piece");
+        require(frontier.crystals.size() == (killed == 7 ? 1u : 0u),
+                "Slime loot before final piece");
       }
       require(total == 24000 && killed == 7 && g.bossKills == 1 && g.slimeFamilies.empty(),
               "Slime family budget / termination");
@@ -59,11 +67,12 @@ int main() {
       require(g.active.size() == existing, "Devourer must not spawn new enemies");
       require(g.foes[outside].summoner < 0 && g.foes[otherBoss].summoner < 0,
               "Devourer claims outside radius or another boss");
-      for (int id : g.active) if (g.foes[id].summoner == boss) {
-        ++offerings;
-        require(std::hypot(g.foes[id].x - 160, g.foes[id].z) <= 50.01f, "Claim outside 50m");
-        g.hurt(id, 250, Laser);
-      }
+      for (int id : g.active)
+        if (g.foes[id].summoner == boss) {
+          ++offerings;
+          require(std::hypot(g.foes[id].x - 160, g.foes[id].z) <= 50.01f, "Claim outside 50m");
+          g.hurt(id, 250, Laser);
+        }
       require(offerings == 8, "Offering count");
       tick(g, 8.2f);
       require(std::abs(g.foes[boss].hp - 9400) < .1f, "Heal must use remaining offering HP");
@@ -80,8 +89,9 @@ int main() {
       tick(g, .02f);
       require(g.foes[boss].feedUsed == 3 && g.foes[boss].absorbClock > 0, "50% phase");
       // Kill the offerings: denied healing and no accidental elite/boss drops.
-      for (int id : g.active) if (g.foes[id].summoner == boss && g.foes[id].hp > 0)
-        g.hurt(id, 10000, Laser);
+      for (int id : g.active)
+        if (g.foes[id].summoner == boss && g.foes[id].hp > 0)
+          g.hurt(id, 10000, Laser);
       float hp = g.foes[boss].hp;
       tick(g, 8.2f);
       require(g.foes[boss].hp == hp, "Dead offerings still heal");
@@ -94,7 +104,8 @@ int main() {
       tick(g, .02f);
       require(g.foes[boss].feedPending == 0 && g.foes[boss].absorbClock == 0,
               "Used phases rearmed by healing");
-      std::cout << "PASS devourer existing foes only, 50m, boss exclusion, one-time thresholds and remaining HP\n";
+      std::cout << "PASS devourer existing foes only, 50m, boss exclusion, one-time thresholds and "
+                   "remaining HP\n";
     }
     {
       auto game = std::make_unique<Game>(false);
@@ -120,20 +131,56 @@ int main() {
       g.autoWaves = false;
       int boss = g.spawn(SiegeBoss, SIEGE_RANGE, 0);
       g.foes[boss].speed = 0;
-      tick(g, 4.98f);
-      require(g.enemyShots.empty() && g.coreDamage == 0, "Siege boss fires early");
-      tick(g, .05f);
-      require(g.enemyShots.size() == 1 && g.enemyShots.front().damage == 200, "Siege shot damage");
-      tick(g, 1.9f);
-      require(g.coreDamage == 200 && g.enemyShots.empty(), "Siege impact not 200");
-      tick(g, 3.2f);
-      require(g.enemyShots.size() == 1 && g.coreDamage == 200, "Siege interval not 5 seconds");
+      tick(g, 5);
+      require(std::abs(g.coreDamage - 200) < .01f && g.enemyShots.empty() &&
+                  g.foes[boss].siegeSpraying,
+              "Continuous boss spray must deal 200 damage in 5 seconds without projectiles");
+      tick(g, 5);
+      require(std::abs(g.coreDamage - 400) < .02f, "Spray is not continuous 40 DPS");
+      g.paused = true;
+      float frozen = g.coreDamage;
+      tick(g, 2);
+      require(g.coreDamage == frozen, "Paused spray deals damage");
+      g.paused = false;
+      g.foes[boss].stun = 1;
+      tick(g, .5f);
+      require(g.coreDamage == frozen && !g.foes[boss].siegeSpraying, "Stunned boss keeps spraying");
+      g.foes[boss].stun = 0;
       g.foes[boss].x = SIEGE_RANGE + 1;
       g.foes[boss].ability = 0;
-      g.enemyShots.clear();
       tick(g, .1f);
-      require(g.enemyShots.empty(), "Siege boss fires outside range");
-      std::cout << "PASS siege boss 63m / 200 damage / 5 seconds / ballistic delay\n";
+      require(g.coreDamage == frozen && !g.foes[boss].siegeSpraying,
+              "Siege boss sprays outside range");
+      g.foes[boss].x = SIEGE_RANGE;
+      tick(g, .1f);
+      require(g.coreDamage > frozen && g.foes[boss].siegeSpraying,
+              "Boss does not resume spray in range");
+      g.hurt(boss, 1000000, Laser);
+      frozen = g.coreDamage;
+      tick(g, .2f);
+      require(g.coreDamage == frozen, "Dead boss keeps spraying");
+      std::cout
+          << "PASS siege boss continuous 40 DPS, 63m, no projectiles, pause, stun and death\n";
+    }
+    {
+      SiegeSpray spray{{63, 11.52f, 0}, 36, 24, 1, .7f};
+      for (auto axes : {std::array<Vec3, 2>{{{1, 0, 0}, {0, 1, 0}}},
+                        std::array<Vec3, 2>{{{0, 0, -1}, {0, 1, 0}}},
+                        std::array<Vec3, 2>{{{1, 0, 0}, {0, .7071068f, -.7071068f}}}}) {
+        Vec3 mouth = spray.muzzle(axes[0], axes[1]);
+        Vec3 offset = mouth - spray.centre;
+        require(std::abs(dot(offset, axes[0]) / spray.width - .42f) < .001f &&
+                    std::abs(dot(offset, axes[1]) / spray.height - .30f) < .001f,
+                "Spray muzzle not attached to trumpet's sprite socket");
+        require(length(spray.point(0, axes[0], axes[1]) - mouth) < .001f,
+                "Spray starts at body centre instead of trumpet");
+        Vec3 impact = spray.impact(axes[0], axes[1]);
+        require(std::abs(std::hypot(impact.x, impact.z) - CORE_RADIUS - .1f) < .001f,
+                "Spray does not hit outer core wall");
+        require(length(spray.point(1, axes[0], axes[1]) - impact) < .001f,
+                "Spray endpoint is disconnected from core");
+      }
+      std::cout << "PASS trumpet socket in platform, rotated and overhead views\n";
     }
     {
       auto game = std::make_unique<Game>(false);

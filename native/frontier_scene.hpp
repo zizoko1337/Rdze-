@@ -1,6 +1,7 @@
 #pragma once
 #include "command_game.hpp"
 #include "game_scene.hpp"
+#include "rover_factory_scene.hpp"
 
 namespace command {
 inline uint64_t pickCrystal(const Session& s, const Mat& matrix, float width, float height,
@@ -28,12 +29,16 @@ inline uint64_t pickCrystal(const Session& s, const Mat& matrix, float width, fl
 }
 class FrontierScene {
   Com<ID3D11ShaderResourceView> roverTexture;
+  Com<ID3D11ShaderResourceView> logoTexture;
   std::vector<Instance> roverSprites;
+  std::vector<Instance> logoSprites;
 
 public:
   explicit FrontierScene(Renderer& r, const std::filesystem::path& assets) {
     r.loadTexture(assets / "rover-rear.png", roverTexture);
+    r.loadTexture(assets / "jezdzix-pol-logo.png", logoTexture);
     roverSprites.reserve(Frontier::MAX_ROVERS);
+    logoSprites.reserve(12);
   }
   void append(GameScene& scene, const Session& s, uint64_t hovered = 0) {
     if (!s.expedition.enabled || s.mode == Mode::Selection)
@@ -46,15 +51,11 @@ public:
       scene.shadows.push_back(instance({p.x, .08f, p.z}, {1.5f, 1.1f, 1}, {0, 0, 0}, 0, 0, .45f));
     }
     scene.extraSprites.push_back({roverTexture, &roverSprites});
+    logoSprites.clear();
     if (s.expedition.levels[size_t(Upgrade::RoverFactory)] > 0) {
-      for (int i = 0; i < 4; ++i) {
-        float a = i * PI / 2;
-        Vec3 p{std::sin(a) * 14.2f, 1.1f, std::cos(a) * 14.2f};
-        scene.box(p, {4.2f, 2.1f, .6f}, {.1f, .2f, .23f}, a);
-        scene.box(p + Vec3{std::sin(a) * .4f, .8f, std::cos(a) * .4f}, {3.8f, .08f, .08f},
-                  {.2f, .9f, .7f}, a, 0, true);
-      }
+      appendRoverFactories(scene, s, logoSprites);
     }
+    scene.extraSprites.push_back({logoTexture, &logoSprites});
     for (const auto& c : f.crystals) {
       Color color = c.boss ? Color{1, .65f, .2f} : Color{.4f, .6f, 1};
       Vec3 p = c.state == CrystalState::Carried

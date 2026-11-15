@@ -44,19 +44,19 @@ int main() {
         acquire(a, Upgrade::RoverFactory);
         acquire(a, Upgrade::RoverBatch, Rarity(tier));
         acquire(a, Upgrade::RoverRate, Rarity(tier));
-        require(a.expedition.roverBatch == tier + 6 &&
+        require(a.expedition.roverBatch == tier + 7 &&
                     std::abs(a.expedition.roverRate - (1.1f + tier * .1f)) < .0001f,
                 "Rarity does not scale production quantity / rate");
         require(!a.expedition.eligible(Upgrade::RoverFactory), "Factory unlock repeats");
-        tick(a, .05f);
-        require(a.frontier.roversMade == uint64_t(tier + 6), "Initial production batch wrong");
+        tick(a, RoverFactories::READY_AT + .2f);
+        require(a.frontier.roversMade == uint64_t(tier + 7), "Initial production batch wrong");
         float clock = a.frontier.productionClock;
         a.world.paused = true;
         tick(a, 2);
         require(a.frontier.productionClock == clock, "Production ignores pause");
         a.world.paused = false;
         tick(a, a.expedition.roverInterval() + .1f);
-        require(a.frontier.roversMade == uint64_t(2 * (tier + 6)), "Production cadence wrong");
+        require(a.frontier.roversMade == uint64_t(2 * (tier + 7)), "Production cadence wrong");
       }
       std::cout << "PASS factory gating, all five batch/rate tiers, actual production and pause\n";
     }
@@ -106,9 +106,9 @@ int main() {
       crowd.expedition.levels[size_t(Upgrade::RoverFactory)] = 1;
       crowd.expedition.roverBatch = 128;
       crowd.expedition.roverRate = 24;
-      tick(crowd, 20);
-      require(crowd.frontier.rovers.size() == Frontier::MAX_ROVERS &&
-                  crowd.frontier.roversMade == Frontier::MAX_ROVERS,
+      tick(crowd, RoverFactories::READY_AT + 20);
+      require(crowd.frontier.rovers.size() + crowd.frontier.factories.queuedCount() == Frontier::MAX_ROVERS &&
+                  crowd.frontier.roversMade == crowd.frontier.rovers.size(),
               "Maximum production exceeds pooled rover cap");
       std::cout << "PASS core avoidance and 2048 live homing rovers under maximum production\n";
     }
@@ -230,14 +230,17 @@ int main() {
       enemy(s, 600, 0);
       s.expedition.levels[size_t(Upgrade::RoverFactory)] = 1;
       s.expedition.roverBatch = 128;
+      s.frontier.factories.active = true;
+      s.frontier.factories.age = RoverFactories::READY_AT;
       s.frontier.stepRovers(s.world, s.expedition, 0);
-      std::array<int, 8> sectors{};
+      for (int i = 0; i < 120; ++i) s.frontier.stepRovers(s.world, s.expedition, 1.f / 60);
+      std::array<int, 6> sectors{};
       for (const auto& r : s.frontier.rovers) {
-        float a = std::atan2(r.position.x, r.position.z) + PI;
-        ++sectors[std::min(7, int(a * 8 / (2 * PI)))];
+        require(r.factory < 6, "Rover has no originating factory");
+        ++sectors[r.factory];
       }
       for (int n : sectors)
-        require(n >= 12, "Factory output is not spread around the whole core");
+        require(n >= 21 && n <= 22, "Six-factory batch differs by more than one rover");
       s.expedition.levels[size_t(Upgrade::RoverFactory)] = 0;
       s.frontier.rovers.clear();
       for (uint32_t i = 0; i < 40; ++i) {

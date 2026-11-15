@@ -8,6 +8,37 @@ namespace arsenal {
 using namespace rdzen;
 constexpr float CORE_RADIUS = 14, CORE_HEIGHT = 18, BUILD_RADIUS = 240, WORLD_RADIUS = 3200;
 constexpr int MAX_FOES = 20000, MAX_TOWERS = 512, MAX_SHOTS = 100000;
+
+// Segment versus the solid extraction-core cylinder. Returns 2 for no hit.
+inline float coreHitFraction(Vec3 from, Vec3 to) {
+  // Almost every projectile step is wholly outside the core's bounding box.
+  if (std::min(from.x, to.x) >= CORE_RADIUS || std::max(from.x, to.x) <= -CORE_RADIUS ||
+      std::min(from.z, to.z) >= CORE_RADIUS || std::max(from.z, to.z) <= -CORE_RADIUS ||
+      std::min(from.y, to.y) >= CORE_HEIGHT || std::max(from.y, to.y) < 0)
+    return 2;
+  Vec3 d = to - from;
+  float enter = 0, leave = 1;
+  float a = d.x * d.x + d.z * d.z;
+  float c = from.x * from.x + from.z * from.z - CORE_RADIUS * CORE_RADIUS;
+  if (a < .000001f) {
+    if (c >= 0) return 2;
+  } else {
+    float b = from.x * d.x + from.z * d.z;
+    float discriminant = b * b - a * c;
+    if (discriminant <= 0) return 2;
+    float root = std::sqrt(discriminant);
+    enter = std::max(enter, (-b - root) / a);
+    leave = std::min(leave, (-b + root) / a);
+  }
+  if (std::abs(d.y) < .000001f) {
+    if (from.y < 0 || from.y >= CORE_HEIGHT) return 2;
+  } else {
+    float bottom = -from.y / d.y, top = (CORE_HEIGHT - from.y) / d.y;
+    enter = std::max(enter, std::min(bottom, top));
+    leave = std::min(leave, std::max(bottom, top));
+  }
+  return leave - enter > .00001f ? enter : 2;
+}
 enum Weapon {
   Laser,
   Minigun,
@@ -57,6 +88,7 @@ enum Species {
 };
 constexpr float SABOTAGE_TIME = 3, BRAIN_RADIUS = SUPPORT_SPACING * 2;
 constexpr float BRAIN_INTERVAL = 6, BRAIN_DISABLE = 4, SIEGE_RANGE = SUPPORT_SPACING * 3;
+constexpr float SIEGE_BOSS_DPS = 200.f / 5;
 constexpr float WYRM_FORWARD_SPEED = 3.2f, WYRM_LATERAL_SPEED = 32, WYRM_SWAY_FREQUENCY = 2.4f;
 struct Color {
   float r, g, b;
@@ -212,6 +244,7 @@ struct Foe {
   Species type = Crawler;
   uint32_t generation = 0;
   bool elite = false;
+  bool siegeSpraying = false;
   uint32_t slimeFamily = 0;
   uint8_t slimeStage = 0, feedUsed = 0, feedPending = 0;
   float absorbClock = 0;
@@ -498,7 +531,28 @@ public:
     auto& e = foes[t.target];
     float dx = e.x - t.x, dz = e.z - t.z;
     float range = weaponInfo(t).range;
-    return dx * dx + dz * dz <= range * range;
+    return dx * dx + dz * dz <= range * range && clearShot(t, t.target);
+  }
+  bool clearShot(const Tower& t, int id) const {
+    if (t.type == Mortar) return true;
+    const auto& e = foes[id];
+    float dx = e.x - t.x, dz = e.z - t.z, distance = std::hypot(dx, dz);
+    float offset = distance > 2.5f ? 2.5f / distance : 0;
+    Vec3 origin{t.x + dx * offset, WEAPONS[t.type].height + (t.type == Tesla ? 1.f : 0.f),
+                t.z + dz * offset};
+    return coreHitFraction(origin, targetPoint(id)) >= 1;
+  }
+  int visibleTarget(const Tower& t, float range) const {
+    int best = -1;
+    float nearest = range * range;
+    grid.radius(t.x, t.z, range, foes, [&](int id) {
+      float dx = foes[id].x - t.x, dz = foes[id].z - t.z, distance = dx * dx + dz * dz;
+      if ((distance < nearest || (distance == nearest && (best < 0 || id < best))) && clearShot(t, id)) {
+        best = id;
+        nearest = distance;
+      }
+    });
+    return best;
   }
   static bool priorityWeapon(Weapon type) { return type == Sniper || type == Lance; }
   static int targetPriority(const Foe& e) { return e.type >= Titan ? 2 : e.elite ? 1 : 0; }
@@ -511,6 +565,7 @@ public:
     int priority = best < 0 ? -1 : targetPriority(foes[best]);
     float nearest = best < 0 ? 1e30f : std::hypot(foes[best].x - t.x, foes[best].z - t.z);
     grid.radius(t.x, t.z, range, foes, [&](int id) {
+      if (!clearShot(t, id)) return;
       int rank = targetPriority(foes[id]);
       float distance = std::hypot(foes[id].x - t.x, foes[id].z - t.z);
       if (rank > priority || (rank == priority && best != t.target && distance < nearest)) {
@@ -552,8 +607,6 @@ public:
     e.generation = gen;
     e.phase = random.unit() * 2 * PI;
     e.ability = 4 + random.unit() * 4;
-    if (species == SiegeBoss)
-      e.ability = 5;
     if (species == Slime) {
       e.slimeFamily = family ? family : ++nextSlimeFamily;
       e.slimeStage = slimeStage;
@@ -808,7 +861,7 @@ public:
     bool focused = false;
     if (focusTime > 0 && valid(focusTarget, focusGeneration)) {
       const auto& e = foes[focusTarget];
-      if (std::hypot(e.x - t.x, e.z - t.z) <= w.range) {
+      if (std::hypot(e.x - t.x, e.z - t.z) <= w.range && clearShot(t, focusTarget)) {
         t.target = focusTarget;
         t.generation = focusGeneration;
         focused = true;
@@ -822,7 +875,7 @@ public:
     if (!inRange(t)) {
       t.target = -1;
       if (t.searchClock <= 0) {
-        t.target = priorityWeapon(t.type) ? priorityTarget(t, w.range) : grid.nearest(t.x, t.z, w.range, foes);
+        t.target = priorityWeapon(t.type) ? priorityTarget(t, w.range) : visibleTarget(t, w.range);
         t.generation = t.target >= 0 ? foes[t.target].generation : 0;
         t.searchClock = .08f;
       }
@@ -867,6 +920,8 @@ public:
                               std::cos(t.angle) * cp} * w.range;
         }
         // A discharge runs to completion, including empty space and retargeting turns.
+        float obstruction = coreHitFraction(muzzle, end);
+        if (obstruction < 1) end = muzzle + (end - muzzle) * obstruction;
         if (t.effectClock <= 0) {
           beam(muzzle, end, w.color, .65f, .075f);
           beam(muzzle, end, {1, .86f, .55f}, .18f, .075f);
@@ -893,6 +948,7 @@ public:
       if (t.cooldown <= 0) {
         float dx = std::sin(t.angle), dz = std::cos(t.angle);
         grid.radius(t.x, t.z, w.range, foes, [&](int i) {
+          if (!clearShot(t, i)) return;
           auto& e = foes[i];
           float ex = e.x - t.x, ez = e.z - t.z, d = std::hypot(ex, ez);
           if (d < .001f || (ex * dx + ez * dz) / d > .78f) {
@@ -929,6 +985,7 @@ public:
     ++fired[t.type];
     if (t.type == Tesla) {
       grid.radius(t.x, t.z, w.range, foes, [&](int i) {
+        if (!clearShot(t, i)) return;
         lightning({t.x, w.height + 1, t.z}, targetPoint(i), i);
         float multiplier = foes[i].type >= Titan ? .10f : foes[i].elite ? .35f : 1.f;
         hurt(i, w.damage * multiplier, Tesla);
@@ -968,6 +1025,13 @@ public:
         float d = length(delta), step = p.speed * dt;
         p.pos = p.pos + delta * (std::min(step, d) / std::max(d, .00001f));
         impact = d <= step + .3f;
+      }
+      if (p.type != Mortar && coreHitFraction(p.previous, p.pos) < 1) {
+        float t = coreHitFraction(p.previous, p.pos);
+        sparks(p.previous + (p.pos - p.previous) * t, WEAPONS[p.type].color, 3, 3);
+        shots[i] = shots.back();
+        shots.pop_back();
+        continue;
       }
       p.trailClock -= dt;
       if (p.trailClock <= 0) {
@@ -1165,6 +1229,7 @@ public:
       int i = active[k];
       auto& e = foes[i];
       e.flash = std::max(0.f, e.flash - dt);
+      e.siegeSpraying = false;
       bool stunned = e.stun > 0;
       e.toxicSlow = std::max(0.f, e.toxicSlow - dt);
       e.towerToxicSlow = std::max(0.f, e.towerToxicSlow - dt);
@@ -1259,14 +1324,18 @@ public:
         beam(targetPoint(i), {0, CORE_HEIGHT * .5f, 0}, {.35f, 1, .1f}, .3f, .2f);
         coreDamage += e.elite ? 50 : 25;
       }
-      if ((e.type == SiegeSpitter || e.type == SiegeBoss) && distance <= SIEGE_RANGE + .1f &&
+      if (e.type == SiegeBoss && distance <= SIEGE_RANGE + .1f) {
+        e.siegeSpraying = true;
+        coreDamage += SIEGE_BOSS_DPS * dt;
+      }
+      if (e.type == SiegeSpitter && distance <= SIEGE_RANGE + .1f &&
           e.ability <= 0) {
         e.ability = 5;
         // A bounded pool of ballistic acid projectiles, rather than hits every frame.
         if (enemyShots.size() < 512)
           enemyShots.push_back(
               {targetPoint(i), 0, std::max(.8f, distance / 35),
-               e.type == SiegeBoss ? 200.f : e.elite ? 90.f : 45.f});
+               e.elite ? 90.f : 45.f});
         sparks(targetPoint(i), {.4f, 1, .08f}, 4, 3);
       }
     }

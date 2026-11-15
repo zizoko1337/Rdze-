@@ -1,6 +1,7 @@
 #pragma once
 #include "renderer.hpp"
 #include "gameplay.hpp"
+#include "enemy_spray.hpp"
 
 namespace arsenal {
 inline Instance instance(Vec3 p, Vec3 scale, Color c, float yaw = 0, float pitch = 0,
@@ -95,6 +96,8 @@ public:
   std::array<std::vector<Instance>, SpeciesCount> enemies;
   Com<ID3D11ShaderResourceView> wormTexture;
   std::vector<Instance> wormSegments;
+  std::vector<SiegeSpray> siegeSprays;
+  std::vector<Instance> siegeSprayMist, siegeSprayDroplets;
   std::vector<Instance> boxes, tubes, glowBoxes, glowTubes, glowRocks, beams, hot, smoke, ringData,
       shadows, rocks, crystals, worldLetters, bossHealth, gunLetters, groundScars, groundHeat;
   explicit GameScene(Renderer& r, const std::filesystem::path& assets) {
@@ -108,6 +111,9 @@ public:
     aspect[Wyrm] = 1312.f / 1199.f;
     r.loadTexture(assets / "boss-wyrm-segment.png", wormTexture);
     wormSegments.reserve(1024);
+    siegeSprays.reserve(32);
+    siegeSprayMist.reserve(1600);
+    siegeSprayDroplets.reserve(1600);
     for (int i = 0; i < SpeciesCount; ++i) {
       r.loadTexture(assets / SPECIES[i].texture, textures[i]);
       enemies[i].reserve(6000);
@@ -378,6 +384,7 @@ public:
   void prepare(const Game& g, const ViewState& view, bool commandDeck = false) {
     extraOpaque.clear();
     extraSprites.clear();
+    siegeSprays.clear();
     wormSegments.clear();
     for (const auto& body : g.worms) {
       if (!g.valid(body.head, body.generation))
@@ -486,6 +493,10 @@ public:
       enemies[e.type].push_back(
           instance({e.x, height * .48f + altitude + bob, e.z},
                    {width * (1 + std::sin(g.time * 5 + e.phase) * .015f), height, 1}, color));
+      if (e.type == SiegeBoss && e.siegeSpraying) {
+        const auto& sprite = enemies[e.type].back();
+        siegeSprays.push_back({{sprite.x, sprite.y, sprite.z}, sprite.sx, sprite.sy, g.time, e.phase});
+      }
       if (e.type >= Titan)
         bossHealth.push_back(instance({e.x, height + altitude + bob + 1.5f, e.z},
                                       {height * .85f, .75f, 1}, {1, .18f, .12f}, 0, 0,
@@ -562,7 +573,44 @@ public:
       ringData.push_back(instance(r.pos, {rad * 2, rad * 2, 1}, r.color, 0, 0, (1 - age) * .8f));
     }
   }
+  void prepareSiegeSprays(const Renderer& r) {
+    siegeSprayMist.clear();
+    siegeSprayDroplets.clear();
+    Vec3 right{r.data.right[0], r.data.right[1], r.data.right[2]};
+    Vec3 up{r.data.up[0], r.data.up[1], r.data.up[2]};
+    for (const auto& spray : siegeSprays) {
+      if (siegeSprayDroplets.size() >= 16384) break;
+      // Opaque-looking, wet olive/brown clots. No linked beam or emissive core.
+      for (int n = 0; n < 144; ++n) {
+        float seed = std::fmod((n + 1) * .618034f + spray.phase, 1.f);
+        float t = std::fmod(n / 144.f + spray.time * (.48f + seed * .12f), 1.f);
+        float angle = n * 2.399963f + spray.phase;
+        float spread = (.08f + t * 2.3f) * (.25f + seed * .75f);
+        Vec3 p = spray.point(t, right, up) +
+                 (right * std::cos(angle) + up * std::sin(angle)) * spread;
+        float size = (.6f + seed * .65f) * (.75f + t * .55f);
+        Vec3 flow = spray.point(std::min(.9999f, t + .015f), right, up) - spray.point(std::max(0.f, t - .015f), right, up);
+        float rotation = std::atan2(-dot(flow, right), dot(flow, up));
+        Color mud = n % 3 == 0 ? Color{.16f, .12f, .025f} :
+                    n % 3 == 1 ? Color{.085f, .13f, .02f} : Color{.10f, .075f, .018f};
+        siegeSprayDroplets.push_back(instance(p, {size, size * (1.3f + seed), 1}, mud, rotation, seed, .9f));
+        if (n % 3 == 0)
+          siegeSprayMist.push_back(instance(p, {size * 3.2f, size * 3.2f, 1}, {.13f, .18f, .045f}, 0, 0, .22f));
+      }
+      Vec3 impact = spray.impact(right, up);
+      for (int n = 0; n < 20; ++n) {
+        float life = std::fmod(spray.time * 1.4f + n * .618034f, 1.f);
+        float angle = n * 2.399963f + spray.phase;
+        Vec3 p = impact + right * (std::sin(angle) * life * 3) +
+                 up * (std::cos(angle) * life * 2.3f) + Vec3{0, -life * life * 3, 0};
+        siegeSprayDroplets.push_back(instance(p, {.3f, .5f, 1}, {.12f, .105f, .022f}, angle, life, 1 - life * .7f));
+        if (n % 4 == 0)
+          siegeSprayMist.push_back(instance(p, {3.5f, 3.5f, 1}, {.15f, .17f, .04f}, 0, 0, .3f));
+      }
+    }
+  }
   void render(Renderer& r) {
+    prepareSiegeSprays(r);
     Instance sky = instance({0, 0, 0}, {1, 1, 1}, {1, 1, 1});
     r.draw(r.quad, &sky, 1, r.white, 11);
     Instance floor =
@@ -590,6 +638,8 @@ public:
     r.draw(r.quad, smoke, r.white, 9);
     r.draw(r.quad, beams, r.white, 7);
     r.draw(r.quad, hot, r.white, 8);
+    r.draw(r.quad, siegeSprayMist, r.white, 9);
+    r.draw(r.quad, siegeSprayDroplets, r.white, 25);
     r.draw(r.quad, worldLetters, r.font, 15);
     r.draw(r.quad, gunLetters, r.font, 18);
   }

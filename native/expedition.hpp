@@ -298,7 +298,7 @@ inline constexpr UpgradeInfo UPGRADES[] = {
      {.45f, .8f, 1}},
     {"Fabryka jeździków",
      "JEDNOSTKI RDZENIA",
-     "Uruchamia produkcję: 5 jeździków co 12 s. Wybuch: 180 obrażeń w promieniu 4 m, mniej bossom.",
+     "6 dronów dostarczy 6 fabryczek JEŹDZIX POL. Po podłączeniu: 6 jeździków co 12 s. Wybuch: 180 obrażeń w promieniu 4 m, mniej bossom.",
      {.3f, 1, .8f}},
     {"Większa seria", "PRODUKCJA JEŹDZIKÓW", "", {.5f, 1, .7f}},
     {"Szybsza linia", "PRODUKCJA JEŹDZIKÓW", "", {1, .75f, .3f}},
@@ -528,7 +528,7 @@ inline std::string upgradeDescription(Upgrade u, Rarity rarity) {
     return "Trafienie oznacza na 3 s. Wieżyczki skupiają ogień. Oznaczony cel otrzymuje +" +
            std::to_string(int(rarity) * 10) + "% obrażeń ze wszystkich źródeł.";
   case Upgrade::RoverBatch:
-    return "+" + std::to_string(int(rarity) + 1) + " jeździków w każdej serii produkcyjnej.";
+    return "+" + std::to_string(int(rarity) + 1) + " jeździków w serii, równo dzielonej między 6 fabryk (różnica najwyżej 1).";
   case Upgrade::RoverRate:
     return "+" + std::to_string((int(rarity) + 1) * 10) + "% bazowego tempa produkcji jeździków.";
   default:
@@ -564,7 +564,7 @@ struct Expedition {
   int offersWithoutCombat = 0, uraniumOffers = 0;
   std::array<bool, TowerTypeCount> towerUnlocked{};
   uint64_t rewardSerial = 0;
-  int crystalRewards = 0, roverBatch = 5;
+  int crystalRewards = 0, roverBatch = 6;
   float roverRate = 1;
   float roverInterval() const { return 12 / roverRate; }
   std::array<int, size_t(Upgrade::Count)> levels{};

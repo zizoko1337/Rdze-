@@ -103,7 +103,7 @@ float3 beamSide(float3 dir,float3 toEye){
  return safeDirection(side,float3(1,0,0));
 }
 VSOut vsMain(VSIn i){VSOut o;float mode=params.x;float3 p=i.p*i.scale;
- if(mode==1||mode==8||mode==9||mode==17){p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
+ if(mode==1||mode==8||mode==9||mode==17||mode==25){if(mode==25){float2 q=p.xy;p.xy=float2(q.x*cos(i.yaw)-q.y*sin(i.yaw),q.x*sin(i.yaw)+q.y*cos(i.yaw));}p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
  else if(mode==2){float3 dir=safeDirection(float3(i.yaw,0,i.extra),float3(0,0,1));float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+side*p.x+dir*p.y;o.normal=float3(0,1,0);}
  else if(mode==7){float3 dir=float3(i.scale.y,i.scale.z,i.yaw);float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+dir*i.p.y+side*i.p.x*i.scale.x;o.normal=float3(0,1,0);}
  else if(mode==10||mode==12){p=i.origin+float3(i.p.x*i.scale.x,0,i.p.y*i.scale.y);o.normal=float3(0,1,0);}
@@ -156,6 +156,17 @@ float4 psMain(VSOut i):SV_TARGET{
  if(mode==11){float3 ray=normalize(i.world);float h=saturate(ray.y);float3 sky=lerp(float3(.19,.28,.31),float3(.008,.02,.04),pow(h,.45));float moon=dot(ray,normalize(float3(-.55,.34,.8)));float disc=smoothstep(.9966,.9968,moon);sky=lerp(sky,float3(.25,.42,.45)*( .7+.25*sin(ray.y*650)),disc);float2 stars=floor(ray.xz/max(ray.y,.05)*380);float star=step(.9991,frac(sin(dot(stars,float2(12.9898,78.233)))*43758.5453))*smoothstep(.1,.6,ray.y);sky+=star*.25;return float4(sky,1);}
  if(mode==6)return float4(pow(max(c.rgb,0),1/2.2),c.a);
  if(mode==7){float edge=saturate(1-abs(i.uv.x*2-1));return float4(c.rgb*(.8+edge),c.a*edge);}
+ if(mode==25){
+  float2 p=i.uv*2-1;float theta=atan2(p.y,p.x);
+  float rim=1+.11*sin(theta*5+i.extra*19)+.065*sin(theta*9-i.extra*31);
+  float d=length(p)/rim;float aa=max(fwidth(d),.025);
+  float mask=1-smoothstep(.82-aa,1+aa,d);clip(mask-.005);
+  float body=.58+.32*sqrt(saturate(1-d*d));
+  float wet=.10*pow(saturate(1-length(p-float2(-.28,.32))*1.6),7);
+  float3 mud=pow(max(c.rgb*body+wet*float3(.65,.6,.4),0),1/2.2);
+  float fog=1-exp(-length(i.world-eye.xyz)*camUp.w);
+  return float4(lerp(mud,float3(.026,.061,.077),fog),c.a*mask);
+ }
  if(mode==8||mode==9){float d=length(i.uv*2-1);clip(1-d);float a=pow(saturate(1-d),mode==8?1.5:1.1);return float4(c.rgb,c.a*a);}
  if(mode==10){float d=length(i.uv*2-1);float rim=1-smoothstep(.006,.018,abs(d-.97));clip(rim-.01);return float4(c.rgb,c.a*rim);}
  if(mode==12){float d=length(i.uv*2-1);clip(1-d);return float4(c.rgb,c.a*pow(saturate(1-d),1.6));}
@@ -624,11 +635,11 @@ public:
     instanceOffset += UINT(count);
     bool overlay = mode == 4 || mode == 5 || mode == 11 || mode == 16 || mode == 19 || mode == 20 || mode == 21,
          soft = mode == 2 || mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
-                mode == 14 || mode == 15 || mode == 18 || mode == 23 || mode == 24;
+                mode == 14 || mode == 15 || mode == 18 || mode == 23 || mode == 24 || mode == 25;
     context->OMSetDepthStencilState(overlay ? depthOff : soft ? depthRead : depthWrite, 0);
     bool add = mode == 2 || mode == 7 || mode == 8 || mode == 24;
     bool blend =
-        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18 || mode == 21 || mode == 23;
+        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18 || mode == 21 || mode == 23 || mode == 25;
     context->OMSetBlendState(add ? additive : blend ? alpha : opaque, nullptr, 0xffffffff);
     context->DrawInstanced(mesh.count, UINT(count), 0, 0);
     ++drawCalls;

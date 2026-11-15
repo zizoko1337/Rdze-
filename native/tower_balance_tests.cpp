@@ -178,7 +178,7 @@ int main() {
       auto s = std::make_unique<Session>(true, true);
       s->mode = Mode::Walking;
       s->spawnTimer = s->frontier.nextBoss = s->frontier.nextElite = 100000;
-      require(s->expedition.roverBatch == 5 && s->expedition.roverInterval() == 12,
+      require(s->expedition.roverBatch == 6 && s->expedition.roverInterval() == 12,
               "Factory base is not five per 12 seconds");
       int a = enemy(s->world, Crawler, 20, 0), b = enemy(s->world, Crawler, 20, 2),
           c = enemy(s->world, Crawler, 20, 5);
