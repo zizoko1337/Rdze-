@@ -24,7 +24,9 @@ Kolejne uruchomienia korzystaja z zapisanych plikow.
 
 Sterowanie:
 Po wejsciu na platforme uruchom wydobycie czerwonym przyciskiem za dzialem [E].
-Lewy komputer: ulepszenia. Prawy: jednorazowe uslugi za punkty z niebieskich kart.
+Lewy komputer: ulepszenia. Prawy odblokowuje karta Lacze wsparcia orbitalnego.
+Brimstone, paraliz i zrzut cyber-swin laduja sie osobno co 4 minuty.
+Kolejne karty przyspieszaja ladowanie albo zwiekszaja magazyn uzyc.
 1-9 wybor jednego z 9 dzial manualnych, Enter start; WASD chodzenie; mysz rozgladanie.
 E fotel / komputer / wyjscie z dziala. LPM strzelanie.
 ; laboratorium ulepszen: wyszukiwanie, Tab rzadkosc, Enter dodaj, Esc zamknij.
@@ -38,7 +40,9 @@ Po 5 min operator robi sie senny: wolniejszy ruch i obrot dziala, rozmycie i mru
 Kawa I-V daje 5/6/7/8/10 min czujnosci. Ekspres I-III: cykl 3/2/1 s, w tym 0,5 s picia.
 Podczas picia sterowanie jest zablokowane, a walka trwa dalej. P pauzuje calosc.
 
-Uran daje wybor ulepszenia przy bocznym komputerze. Boss co 3 minuty.
+Uran daje wybor ulepszenia przy bocznym komputerze. Pierwszy boss po 3 min.
+Odstepy bossow: 150/120/90/60/30 s; potem co 30 s. Mutacje roju bazowo co 3 min.
+Polaczenie z kapitanem na HUD pokazuje rarity i efekt kazdej mutacji.
 Rdzen regeneruje 3 HP/s. Nanoboty regenerujace zwiekszaja regeneracje.
 Pompa naprzeciw radia pokazuje wydobycie i stabilnosc (procent HP rdzenia).
 Fabryka jezdzikow odblokowywana jest karta ulepszenia.

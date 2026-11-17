@@ -200,6 +200,8 @@ class CommandUi : public GameUi {
 
 public:
   float radarHeading = 0;
+  bool captainVisible = false;
+  Rect captainPanel() const { return {26,height-246,328,168}; }
   static constexpr float COLLECTOR_Y = 440;
   bool tacticalCovered(float px, float py) const {
     float x = px / scale, y = py / scale;
@@ -207,6 +209,7 @@ public:
            Rect{width - 354, 94, 328, 113}.contains(x, y) ||
            Rect{width - 238, 220, 212, 204}.contains(x, y) ||
            Rect{width - 354, COLLECTOR_Y, 328, 145}.contains(x, y) ||
+           (captainVisible && captainPanel().contains(x,y)) ||
            Rect{26, 454, 310, 102}.contains(x, y);
   }
   Rect collectorButton() const { return {width - 336, COLLECTOR_Y + 101, 292, 29}; }
@@ -321,12 +324,13 @@ public:
   }
   void drawServices(Renderer& r, const Session& s) {
     rect(r, {0, 0, width, height}, {.01f, .025f, .05f}, .98f);
-    text(r, 65, 55, "HELIOS / JEDNORAZOWE USŁUGI", 28, {.3f, .65f, 1});
-    text(r, 65, 110, "Punkty usług: " + std::to_string(s.expedition.servicePoints), 24, mint);
-    text(r, 65, 157, "Niebieska karta ulepszenia daje 1 punkt. Każda usługa kosztuje 1 punkt.", 15,
+    const auto& bank = s.expedition.support;
+    text(r, 65, 55, "HELIOS / WSPARCIE ORBITALNE", 28, {.3f, .65f, 1});
+    text(r, 65, 110, "Ładowanie: " + number(bank.seconds(),0) + " s / zapas każdej usługi: " + number(bank.capacity()), 23, mint);
+    text(r, 65, 157, "Każda usługa ładuje się osobno. Ulepszenia zwiększają tempo lub pojemność magazynu.", 15,
          muted);
     text(r, 65, 188,
-         "Anulowanie przed wskazaniem celu zachowuje punkt. Wybór miejsca zatrzymuje czas.", 14,
+         "Anulowanie zachowuje użycie. Wybór miejsca zatrzymuje czas i ładowanie.", 14,
          muted);
     if (!s.expedition.miningStarted)
       text(r, 65, 240, "Najpierw uruchom wydobycie czerwonym przyciskiem za działem.", 17,
@@ -336,13 +340,17 @@ public:
       panel(r, card);
       const auto& info = SERVICES[i];
       rect(r, {card.x, card.y, card.w, 4}, info.color);
-      text(r, card.x + 22, card.y + 22, "[" + std::to_string(i + 1) + "] KOSZT: 1 PUNKT", 14,
+      text(r, card.x + 22, card.y + 22, "[" + std::to_string(i + 1) + "] ZAPAS: " + number(bank.charges[i]) + "/" + number(bank.capacity()), 14,
            info.color);
       text(r, card.x + 22, card.y + 75, info.name, 23);
       paragraph(r, card.x + 22, card.y + 122, info.description, 36, 14, muted);
-      text(r, card.x + 22, card.y + 252,
-           s.expedition.servicePoints > 0 ? (i == 1 ? "ZAMÓW FALĘ" : "WYBIERZ CEL")
-                                          : "BRAK PUNKTÓW",
+      rect(r, {card.x+22,card.y+218,card.w-44,7}, {.045f,.09f,.12f});
+      rect(r, {card.x+22,card.y+218,(card.w-44)*(bank.charges[i]>=bank.capacity()?1.f:float(bank.progress[i])),7}, info.color);
+      text(r, card.x + 22, card.y + 236,
+           bank.charges[i]>=bank.capacity()?"MAGAZYN PEŁNY":"KOLEJNE ZA " + number(std::ceil((1-bank.progress[i])*bank.seconds()),0) + " s",11,muted);
+      text(r, card.x + 22, card.y + 267,
+           bank.ready(Service(i)) ? (i == 1 ? "URUCHOM FALĘ" : "WYBIERZ MIEJSCE")
+                                 : "ŁADOWANIE",
            14, info.color);
     }
     text(r, 65, height - 65, "1 / 2 / 3 lub kliknięcie — wybierz   |   E / Esc — wróć do obrony",
@@ -480,6 +488,19 @@ public:
            "Wydobycie: " + number(e.rate(), 1) + "/s   Ulepszenia: " + std::to_string(e.selected),
            12, muted);
       text(r, 42, 279, e.shipping ? "TRANSPORT W TOKU" : "MAGAZYN URANU", 11, mint);
+      if (e.shield.purchased) {
+        const auto& shield = e.shield;
+        Color c = shield.online() ? Color{.2f,.8f,1} : Color{1,.6f,.15f};
+        panel(r,{26,320,310,110});
+        text(r,42,333,"TARCZA / JAN KOWALSKI COMPANY",11,c);
+        text(r,42,356,!shield.installed ? "Dron: dostawa za " + number(std::max(0.f,EnergyShield::LAND_TIME-shield.deliveryAge),1) + " s" :
+             shield.starting() ? "ROZRUCH: " + number(std::max(0.f,EnergyShield::STARTUP_TIME-shield.startupAge()),1) + " s" :
+             shield.rebuildRemaining > 0 ? "ODBUDOWA: " + number(float(std::ceil(shield.rebuildRemaining))) + " s" :
+             number(shield.hp) + " / " + number(shield.maxHp) + " HP",16,c);
+        rect(r,{42,386,275,6},{.1f,.19f,.24f});
+        rect(r,{42,386,275*shield.hp/shield.maxHp,6},c);
+        text(r,42,405,"REGEN +" + number(shield.regeneration,1) + " HP/s",10,muted);
+      }
       panel(r, {width - 354, 94, 328, 113});
       text(r, width - 336, 108, "LOGISTYKA / WYPŁATY", 12, mint);
       text(r, width - 336, 138, "Oczekujące: " + std::to_string(e.rewards.size()), 19,
@@ -518,7 +539,7 @@ public:
                  " / trafienia: " + std::to_string(s.frontier.roverHits),
              12, muted);
       }
-      std::string modules = "USŁUGI: " + std::to_string(e.servicePoints) + "  ";
+      std::string modules = e.support.unlocked ? "WSPARCIE: " + std::to_string(e.support.total()) + "  " : "";
       if (s.world.frost)
         modules += "KRIO  ";
       if (e.levels[size_t(Upgrade::Focus)] > 0)
@@ -548,7 +569,7 @@ public:
       panel(r, {width / 2 - 315, height - 150, 630, 88});
       std::string instruction =
           s.serviceTarget != Service::None
-              ? (s.serviceTarget == Service::Overload ? "[LPM] Wybierz wieżyczkę / PPM anuluj"
+              ? (s.serviceTarget == Service::CyberPigs ? "[LPM] Wolny heks na klatkę / PPM anuluj"
                                                       : "[LPM] Cel Brimstone / PPM anuluj")
           : hoveredCrystal     ? "[LPM] Wyślij drona po wskazany kryształ"
           : s.sentryStock == 0 ? "Brak wieżyczek w magazynie. Tab — wróć."
@@ -559,7 +580,9 @@ public:
               : std::string("[LPM] Dostarcz: ") + WEAPONS[s.pendingSentry()].name;
       text(r, width / 2 - 291, height - 135, instruction, 18, mint);
       text(r, width / 2 - 291, height - 99,
-           s.sentryStock > 0 ? "6 s do lądowania / balon odczepi się i odleci"
+           s.serviceTarget == Service::CyberPigs ? "4 drony / 6 s do lądowania / 2 s do uwolnienia świń"
+           : s.serviceTarget == Service::Brimstone ? "Ostrzeżenie 3 s / 25 000 obrażeń łącznie / śledzi bossa"
+           : s.sentryStock > 0 ? "6 s do lądowania / balon odczepi się i odleci"
                              : "Zajęte i zarezerwowane heksy nie przyjmują nowych zrzutów.",
            13, muted);
     } else if (s.mode == Mode::Walking) {
@@ -590,9 +613,9 @@ public:
         text(r, width / 2 - 220, height * .64f + 48, "Stacja, utwory i glosnosc", 13, muted);
       } else if (s.nearServices()) {
         panel(r, {width / 2 - 245, height * .64f, 490, 70});
-        text(r, width / 2 - 220, height * .64f + 10, "[E] JEDNORAZOWE USŁUGI", 25, {.3f, .65f, 1});
+        text(r, width / 2 - 220, height * .64f + 10, "[E] WSPARCIE ORBITALNE", 25, {.3f, .65f, 1});
         text(r, width / 2 - 220, height * .64f + 48,
-             "Punkty: " + std::to_string(s.expedition.servicePoints), 13, muted);
+             "Gotowe użycia: " + std::to_string(s.expedition.support.total()), 13, muted);
       } else if (s.nearTerminal()) {
         panel(r, {width / 2 - 245, height * .64f, 490, 70});
         text(r, width / 2 - 220, height * .64f + 10, "[E] KOMPUTER / WYPŁATY", 25, mint);

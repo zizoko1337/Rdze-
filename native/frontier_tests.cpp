@@ -14,6 +14,7 @@ void tick(Session& s, float seconds) {
 void quiet(Session& s) {
   s.mode = Mode::Walking;
   s.spawnTimer = s.frontier.nextBoss = s.frontier.nextElite = 100000;
+  s.frontier.mutations.nextMutation = 100000; // Isolate the baseline spawn/loot rules.
 }
 void acquire(Session& s, Upgrade u, Rarity rarity = Rarity::Uncommon) {
   rarity = s.expedition.effectiveRarity(u, rarity);
@@ -198,13 +199,13 @@ int main() {
       s.world.time = 179.9f;
       tick(s, .2f);
       require(s.frontier.bossesSpawned == 1 && s.frontier.spawned[Titan] == 1 &&
-                  s.frontier.nextBoss == 360,
+                  s.frontier.nextBoss == 330,
               "First scheduled boss missing");
       int id = s.world.active.back();
       s.world.hurt(id, s.world.foes[id].hp, Laser);
       tick(s, .05f);
       require(s.frontier.respiteUntil > s.world.time + 14, "Boss death gives no breathing room");
-      s.world.time = 359.9f;
+      s.world.time = 329.9f;
       tick(s, .2f);
       require(s.frontier.bossesSpawned == 2 && s.frontier.spawned[Queen] == 1,
               "Boss variants do not alternate");
@@ -221,7 +222,7 @@ int main() {
       int crawler = s.frontier.spawnFoe(s.world, Crawler, 200, 0);
       require(s.world.foes[crawler].maxHp == SPECIES[Crawler].hp,
               "Basic crawler scales beyond base rover damage");
-      std::cout << "PASS boss quality odds, warning, 3-minute schedule, respite and five species "
+      std::cout << "PASS boss quality odds, warning, accelerating schedule, respite and five species "
                    "progression\n";
     }
     {

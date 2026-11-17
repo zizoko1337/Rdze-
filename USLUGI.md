@@ -1,39 +1,39 @@
-# Stanowiska dowodzenia i jednorazowe usługi
+# Odnawialne wsparcie orbitalne
 
-Normalny start: wybór broni, Enter, przygotowanie na platformie, czerwony przycisk za działem [E]. Dopiero wtedy ruszają wydobycie, zegar naporu i pierwsze bestie. Po naciśnięciu grzybek opada, dwie połówki zapadni rozsuwają się, a kolumna zjeżdża pod pokład. Zapadnia pozostaje otwarta i wyjeżdża z niej radio URANIUM FM 2137. Pełna sekwencja trwa około 3,45 s i respektuje pauzę. Przycisk nie pojawia się ponownie w tym podejściu; R resetuje ekspedycję i przywraca go.
+**Łącze wsparcia orbitalnego jest gwarantowaną propozycją w jednym z pierwszych pięciu rozdań.** Jeśli nie wypadnie wcześniej, pojawi się w piątym jako Rare. Liczą się wszystkie normalne rozdania: z uranu i kryształów. Wybranie tej karty pozostaje dobrowolne; gwarancja nie instaluje ulepszenia automatycznie. Zdobyte łącze nie pojawia się ponownie.
 
-Lewy komputer, patrząc od miejsca startu w kierunku działa, służy do odbierania ulepszeń. Ma zieloną lampkę migającą przy dostępnej nagrodzie i trzycyfrowy ekran licznika (0–999). Stary żółty poziomy pasek dostępności usunięto. Prawy komputer obsługuje jednorazowe usługi i ma osobny niebieski licznik punktów.
+Lewy komputer nadal obsługuje nagrody. Prawy pozostaje zgaszony i niedostępny do czasu zdobycia unikalnej karty **Łącze wsparcia orbitalnego (Rare)**. Karta włącza ekran oraz kontrolki i daje po jednym gotowym użyciu każdej usługi. Działa po rozpoczęciu wydobycia.
 
-## Punkty
+Każda z trzech usług ładuje się **osobno, bazowo przez 240 s**. Czas płynie podczas walki i poruszania się po pokładzie oraz w zwykłym widoku taktycznym. Pauza, terminale, wybieranie celu i inne ekrany zatrzymujące symulację zatrzymują także ładowanie. Zapas i postęp widać na fizycznym ekranie oraz w panelu komputera. Pełny magazyn zatrzymuje ładowanie; dodatkowy czas nie jest zachowywany ponad limit.
 
-Nowa powtarzalna karta „Punkt usług” występuje wyłącznie jako niebieskie Rare. Wybranie jej przy lewym komputerze zużywa normalną nagrodę i daje dokładnie jeden punkt usług. Nie jest to osobna, darmowa wypłata. Punkty nie znikają po zamknięciu komputera; reset ekspedycji usuwa je wraz z pozostałym rozwojem.
+| Karta | Rzadkość | Działanie |
+| --- | --- | --- |
+| Łącze wsparcia orbitalnego | Rare | Jednorazowe odblokowanie wszystkich usług i po jednym gotowym użyciu |
+| Szybsze ładowanie usług | Uncommon | +30% bazowego tempa ładowania, do 5 kart; czas wynosi `240 / (1 + 0,3 × liczba kart)` s |
+| Magazyn wsparcia | Rare | +1 miejsce w osobnym magazynie każdej usługi, do 3 kart; maksymalnie po 4 użycia |
 
-Prawy komputer otwiera się przez E z bliska. Każda usługa kosztuje 1 punkt. Wybór myszą albo 1/2/3. E/Esc zamyka panel. Usługi są dostępne po uruchomieniu wydobycia.
+Karty tempa i magazynu pojawiają się dopiero po odblokowaniu komputera i znikają po osiągnięciu limitów. Ulepszenie tempa zachowuje procent rozpoczętego ładowania. Powiększenie magazynu tworzy wolne miejsca do naładowania. Reset ekspedycji zeruje cały rozwój wsparcia.
 
 | Usługa | Cel | Efekt |
 | --- | --- | --- |
-| Brimstone | Dowolne poprawnie wskazane miejsce na powierzchni | Ostrzeżenie 3 s, potem orbitalna wiązka przez 3 s. 6 impulsów co 0,5 s, każdy po 10 000 obrażeń w promieniu 10 m: do 60 000 na nieruchomy cel |
-| Fala ogłuszająca | Bez wskazywania miejsca | Po 3 s ogłusza wszystkich obecnych, żywych przeciwników na 5 s, także bossów. Zatrzymuje marsz, ataki i zdolności, w tym przywoływanie. Trucizna i podpalenie nadal działają |
-| Przeciążenie | Własna, wylądowana wieżyczka bojowa lub wsparcie | Po 3 s niszczy ją i zadaje 50 000 obrażeń każdemu przeciwnikowi w promieniu 40 m. Okrąg zasięgu widać podczas wybierania celu |
+| Brimstone | Punkt na ziemi lub boss | Po ostrzeżeniu 3 s: 25 000 obrażeń łącznie w sześciu impulsach co 0,5 s, promień 10 m. Wskazany boss jest śledzony |
+| Paraliż | Bez wskazywania miejsca | Po 3 s ogłusza wszystkich obecnych przeciwników, również bossów, na 5 s; trucizna i podpalenie działają dalej |
+| Cyberświnie | Wolny heks bez wieżyczki ani zamówionej dostawy | Cztery drony na czterech linach opuszczają klatkę przez 6 s. Po lądowaniu odlatują. Po kolejnych 2 s klatka rozpada się i wypuszcza dwie cyberświnie |
 
-Brimstone i przeciążenie otwierają widok taktyczny. Czas stoi podczas wybierania celu. Punkt zostaje wydany dopiero po poprawnym kliknięciu; pusty heks przy przeciążeniu, niepoprawny punkt i już przeciążana instalacja nie zużywają punktu. PPM/Esc/Tab anuluje celowanie i wraca do panelu usług. Fala jest zamawiana od razu po wybraniu i wtedy pobiera punkt.
+Wybór usługi odbywa się klawiszami 1/2/3 lub myszą. E/Esc zamyka komputer. Brimstone i cyberświnie przechodzą do wskazania celu na mapie; PPM/Esc/Tab anuluje bez zużycia użycia. Usługa pobiera własny ładunek dopiero po poprawnym zamówieniu. Fala pobiera go od razu przy wyborze. Usługi nie korzystają już z punktów ani z poświęcania wieżyczek.
 
-Po potwierdzeniu wraca zwykły upływ czasu. Otwarcie terminala, pauza lub trwający wybór miejsca na inną wieżyczkę zatrzymują także odliczanie usług. Brimstone działa w stałym punkcie; przeciwnik może opuścić jego promień. Fala obejmuje jednostki istniejące w chwili wybuchu, nie przyszłe spawny. Kolejne ogłuszenie odnawia czas zamiast dodawać go bez ograniczeń. Wspólny cel zwiększa obrażenia usług tak samo jak innych źródeł.
+## Cyberświnie
 
-## Poświęcenie wieżyczki
+Dwie jednostki biegną w przeciwnych kierunkach po pierścieniu o promieniu równym odległości wybranego heksu od rdzenia. Podgląd przy celowaniu pokazuje ten pierścień. Prędkość biegu wynosi 28 m/s, więc dalszy zrzut działa dłużej. Każda świnia wykonuje dokładnie pięć okrążeń, potem przestaje atakować i ucieka na zewnątrz mapy; po 18 s ucieczki znika.
 
-Przeciążenie usuwa aktywny model i zwalnia heks oraz jednostkę limitu 210. Usunięcie przekaźnika lub generatora natychmiast przelicza jego wsparcie dla sąsiadów i obszary spowolnienia. Można ponownie zdobyć i dostarczyć wybrany wcześniej typ. Zniszczenie ostatniego egzemplarza nie zmienia jednak technologii wybranych na to podejście: limit 4 typów bojowych i 2 wsparcia pozostaje zachowany.
+- Lasery: 200 obrażeń co 0,4 s, do 70 m, z ograniczeniem do przedniej części pola widzenia. Rdzeń zasłania strzał. Lasery mogą trafiać jednostki latające.
+- Taranowanie: 1500 nominalnych obrażeń przy przecięciu ścieżki naziemnego przeciwnika. Każda świnia może trafić tę samą jednostkę raz na okrążenie. To chroni przed naliczaniem obrażeń w każdej klatce przy stałym kontakcie. Nowe jednostki korzystające z ponownie użytego slotu nie dziedziczą odporności.
+- Podczas biegu i ucieczki pozostaje krótki kurz. Profil świni jest odbijany zgodnie z ruchem względem aktualnej kamery. [Grafika i pełny prompt](ASSETS-CYBER-SWINIE.md).
 
-Odliczanie wiąże się z trwałym identyfikatorem instalacji, a nie indeksem tablicy. Jednoczesne poświęcenie kilku wież nie zmienia celów po usunięciu wcześniejszych. Gdy cel usługi przestanie istnieć przed detonacją, punkt jest zwracany; nowa wieżyczka na tym samym miejscu nie zostaje przypadkiem zniszczona.
+Heks jest zarezerwowany do uwolnienia świń. W tym czasie nie można zamówić tam drugiej klatki ani wieżyczki; istniejąca lub nadlatująca wieżyczka uniemożliwia zrzut. Po uwolnieniu heks jest ponownie dostępny. Żadna wieżyczka nie jest niszczona przez usługę. Wspólna pula jest ograniczona do 64 aktywnych świń, z uwzględnieniem zamówionych par. Przy braku miejsca zamówienie zachowuje ładunek. Kontakt używa siatki przestrzennej i stałego indeksowania po jednostce, bez wyszukiwania w historii trafień.
 
 ## Próby
 
-`POLIGON_USLUG.bat` daje 6 punktów usług, 3 gotowe wybory niebieskiej karty i 20 000 HP rdzenia. Przycisk nadal trzeba nacisnąć; potem można od razu testować prawy komputer. Normalne `START.bat` i `Rdzen.exe` nie dają początkowych punktów.
+`POLIGON_USLUG.bat` włącza komputer, daje po 4 użycia i 20 000 HP oraz trzy wybory ulepszeń. Przycisk wydobycia nadal trzeba nacisnąć. Normalny `START.bat` rozpoczyna z wyłączonym komputerem.
 
-`services-tests.exe` sprawdza przygotowanie przed startem, jednokrotne uruchomienie, role konsol, dokładnie Rare, wydawanie i zachowywanie punktów, sześć impulsów po 10 000 obrażeń Brimstone, 10 m zasięgu, pauzę, paraliż bossów i ataków oraz promień 40 m przeciążenia. Sprawdza też zwalnianie miejsca, pamięć wybranego typu, utratę aur, jednoczesne detonacje i zwrot za unieważniony cel.
-
-`TEST_USLUG.bat` wykonuje interakcje przez klawiaturę i mysz: naciska przycisk, czeka na jego schowanie, odbiera punkt z lewego komputera, otwiera prawy i zamawia wszystkie usługi. Kontrolowane nieruchome cele i dwa dodatkowe punkty są wyłącznie danymi testu. Zrzuty i wynik JSON: `artifacts/command/services/`.
-
-Dotychczasowe testy ekspedycji zaczynają kontrolowaną symulację już po starcie wydobycia; nowy test oddzielnie weryfikuje rzeczywiste naciśnięcie czerwonego przycisku. Po zmianie gry samodzielny EXE odtwarza `ZROB_EXE.bat`.
-
-Obie ofensywne usługi mają dedykowany basowy dźwięk syntetyzowany lokalnie. Brimstone pulsuje szeroką kolumną z białym rdzeniem, rozbłyskiem i bocznymi wyładowaniami. Przeciążenie tworzy rozszerzającą się falę, gorącą kulę, iskry i dym. Dźwięki respektują wyciszenie M i pauzę, a liczba głosów jest ograniczona.
+`native/services_tests.cpp` zachowuje testy przycisku, konsol, Brimstone i paraliżu. `native/cyber_pig_tests.cpp` sprawdza odblokowanie i karty, osobne odnawianie, pauzę, pojemność, heksy i rezerwacje, czas dostawy, obrażenia, pięć okrążeń, ucieczkę, limit pamięci i scenariusz 6000 przeciwników z 64 świniami. `TEST_USLUG.bat` wykonuje interakcje przez klawiaturę i mysz oraz zapisuje podglądy i raport w `artifacts/command/services/`.

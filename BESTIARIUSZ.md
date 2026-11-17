@@ -9,10 +9,11 @@ Karty zawierają prawdziwe sprite’y, HP, prędkość i opis ataku. HP i prędk
 | Sabotażysta — elita | 1600 | 5 m/s | Wybiera najbliższą wieżyczkę, podchodzi na 4 m, niszczy po 3 sekundach nieprzerwanego ataku. Ogłuszenie zeruje postęp. Gdy nie ma wieżyczek, idzie na rdzeń. |
 | Plujec oblężniczy | 900 | 3 m/s | Zatrzymuje się 63 m od środka, przy drugim rzędzie stanowisk. Strzela kwasem za 45 obrażeń co 5 s. Pocisk leci łukiem i zadaje obrażenia po dolocie. |
 | Nadumysł — boss mózgowy | 16000 | 2,6 m/s | Co 6 s wysyła impuls o promieniu 42 m, wyłączający wieżyczki na 4 s. Obejmuje wsparcie: wyłącza premie tempa, zasięgu i śnieżycę. |
+| Tunelarz — boss segmentowy | 22000 | 2,6 m/s do rdzenia, 42 m/s na boki | 32 segmenty nurkujące po sinusoidzie. Losuje ruch w lewo lub prawo; zwroty przy 70/40/10% HP. Zakopane części przyjmują wyłącznie truciznę. Wieżyczki celują w wynurzone części. |
 
 Zniszczenie wieżyczki zwalnia heks i licznik posiadanych kopii. Odblokowana technologia zostaje zapamiętana. Zakłócone wieżyczki ciemnieją i dostają fioletowy znacznik; po 4 s wracają do działania. Już wystrzelone pociski kontynuują lot. Impulsy kolejnych Nadumysłów przedłużają wyłączenie bez sumowania czasu. Śmierć bossa nie cofa już nałożonego zakłócenia.
 
-Sabotażyści dołączają do elitarnego harmonogramu od 2:15, co drugie spotkanie elity. Plujce oblężnicze dołączają do zwykłych fal od 5:00. Bossowie występują co 3 minuty w cyklu Tytan → Królowa → Nadumysł (pierwszy Nadumysł w 9:00). Nadumysł zawsze zostawia kryształ bossa; sabotażysta korzysta z dotychczasowej 1% szansy elity.
+Sabotażyści dołączają do elitarnego harmonogramu od 2:15, co drugie spotkanie elity. Plujce oblężnicze dołączają do zwykłych fal od 5:00. Pierwszy boss nadchodzi po 3 min; następne odstępy maleją do 30 s. Pierwszy Nadumysł pojawia się w 7:30, bez dodatkowych bossów z mutacji. Nadumysł zawsze zostawia kryształ bossa; sabotażysta korzysta z dotychczasowej 1% szansy elity. [Progresja i mutacje](MUTACJE_PRZECIWNIKOW.md).
 
 Wcześniejszy plujec strzela co 3 s; usunięto przypadkowe dodatkowe obrażenia kontaktowe zadawane z dystansu.
 

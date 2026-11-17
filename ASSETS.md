@@ -6,6 +6,14 @@ Nowy natywny poligon ma sześć dodatkowych grafik przeciwników, w tym dwóch b
 
 Wygenerowano wbudowanym narzędziem `image_gen` (umiejętność `imagegen`), bez CLI i bez klucza API. Pliki skopiowane do projektu; gra nie odwołuje się do katalogu generatora. Model działka jest autorską geometrią 3D według szkicu użytkownika: prostokątny nieruchomy słup, prostokątna obrotowa głowica, krótka lufa i czerwony emiter. Żółta błyskawica jest rysowana proceduralnie na przezroczystej teksturze.
 
+Cyberświnia z profilu: [grafika i pełny prompt](ASSETS-CYBER-SWINIE.md).
+
+Portrety kapitana do animowanego HUD-u łączności: [grafiki i pełne prompty](ASSETS-KAPITAN.md).
+
+Biało-szary boss Tunelarz: [głowa wiertnicza, segment i pełne prompty](ASSETS-TUNELARZ.md).
+
+Naklejka Jan Kowalski Company na generatorze tarczy: [grafika i pełny prompt](ASSETS-TARCZA.md).
+
 ## public/assets/ground-basalt.png
 
 Tekstura bazaltowego podłoża wersji natywnej. Wygenerowana wbudowanym `image_gen` przy użyciu umiejętności `imagegen` i skopiowana do repozytorium. Pełny prompt:

@@ -90,12 +90,16 @@ public:
     bool plain = false;
   };
   std::vector<OpaquePart> extraOpaque;
+  struct ExtraDraw { Mesh* mesh; Instance data; ID3D11ShaderResourceView* texture; int mode; };
+  std::vector<ExtraDraw> extraDraws;
   std::vector<std::pair<ID3D11ShaderResourceView*, const std::vector<Instance>*>> extraSprites;
   std::array<Com<ID3D11ShaderResourceView>, SpeciesCount> textures;
   std::array<float, SpeciesCount> aspect{};
   std::array<std::vector<Instance>, SpeciesCount> enemies;
   Com<ID3D11ShaderResourceView> wormTexture;
   std::vector<Instance> wormSegments;
+  Com<ID3D11ShaderResourceView> tunnelerTexture;
+  std::vector<Instance> tunnelerSegments;
   std::vector<SiegeSpray> siegeSprays;
   std::vector<Instance> siegeSprayMist, siegeSprayDroplets;
   std::vector<Instance> boxes, tubes, glowBoxes, glowTubes, glowRocks, beams, hot, smoke, ringData,
@@ -110,6 +114,8 @@ public:
     aspect[Slime] = aspect[Devourer] = aspect[SiegeBoss] = 1.5f;
     aspect[Wyrm] = 1312.f / 1199.f;
     r.loadTexture(assets / "boss-wyrm-segment.png", wormTexture);
+    r.loadTexture(assets / "boss-tunneler-segment.png", tunnelerTexture);
+    tunnelerSegments.reserve(1024);
     wormSegments.reserve(1024);
     siegeSprays.reserve(32);
     siegeSprayMist.reserve(1600);
@@ -383,9 +389,11 @@ public:
   }
   void prepare(const Game& g, const ViewState& view, bool commandDeck = false) {
     extraOpaque.clear();
+    extraDraws.clear();
     extraSprites.clear();
     siegeSprays.clear();
     wormSegments.clear();
+    tunnelerSegments.clear();
     for (const auto& body : g.worms) {
       if (!g.valid(body.head, body.generation))
         continue;
@@ -417,6 +425,26 @@ public:
       }
     }
     core(g.time, commandDeck);
+    for (const auto& body : g.tunnelers) {
+      if (!g.valid(body.head, body.generation)) continue;
+      const auto& head = g.foes[body.head];
+      for (int part = 0; part < body.SEGMENTS; ++part) {
+        if (!g.partExposed(body.head, part)) continue;
+        auto p = body.segments[part];
+        float size = body.segmentSize(part);
+        Color tint = head.poison > 0 || head.towerPoisonDps > 0 ? Color{.75f, 1, .7f} : Color{1, 1, 1};
+        if (head.flash > 0) tint = {1.5f, 1.35f, 1.25f};
+        tunnelerSegments.push_back(instance(p, {size * 1.25f, size, 1}, tint));
+        shadows.push_back(instance({p.x, .08f, p.z}, {size * 1.2f, size * .65f, 1},
+                                   {0, 0, 0}, 0, 0, .3f));
+        if (std::abs(p.y) < size * .45f) {
+          shadows.push_back(instance({p.x, .1f, p.z}, {size * 1.1f, size * .85f, 1},
+                                     {.035f, .04f, .04f}, 0, 0, .8f));
+          ringData.push_back(instance({p.x, .15f, p.z}, {size, size * .8f, 1},
+                                      {.35f, .37f, .36f}, 0, 0, .5f));
+        }
+      }
+    }
     for (const auto& t : g.towers) {
       makeTower(t, g.time);
       if (t.disabledUntil > g.time) {
@@ -476,7 +504,14 @@ public:
       auto& e = g.foes[i];
       if (e.hp <= 0)
         continue;
-      float bob =
+      if (e.type == Tunneler && !g.partExposed(i, -1)) {
+        auto point = g.targetPoint(i);
+        if (g.targetable(i))
+          bossHealth.push_back(instance(point + Vec3{0, 11, 0}, {14, .75f, 1},
+                                        {1, .18f, .12f}, 0, 0, std::clamp(e.hp / e.maxHp, 0.f, 1.f)));
+        continue;
+      }
+      float bob = e.type == Tunneler ? 0 :
           (e.stun > 0 ? 0 : std::abs(std::sin(g.time * (e.type >= Titan ? 2 : 8) + e.phase))) *
           (e.type >= Titan ? .3f : .15f);
       float height = e.size, width = e.size * aspect[e.type];
@@ -489,6 +524,7 @@ public:
         color = {.45f, .7f, 1.5f};
       if (e.flash > 0)
         color = {1.5f, 1.3f, 1.3f};
+      if (e.dodgeFlash > 0) color = {.3f,1.2f,1.6f};
       float altitude = e.altitude + (e.type == Floater ? std::sin(g.time * 2 + e.phase) * .6f : 0);
       enemies[e.type].push_back(
           instance({e.x, height * .48f + altitude + bob, e.z},
@@ -629,8 +665,9 @@ public:
     r.draw(r.tube, glowTubes, r.white, 6);
     r.draw(r.rock, glowRocks, r.white, 6);
     r.draw(r.quad, wormSegments, wormTexture, 1);
+    r.draw(r.quad, tunnelerSegments, tunnelerTexture, 26);
     for (int i = 0; i < SpeciesCount; ++i)
-      r.draw(r.quad, enemies[i], textures[i], 1);
+      r.draw(r.quad, enemies[i], textures[i], i == Tunneler ? 26 : 1);
     r.draw(r.quad, bossHealth, r.white, 17);
     for (const auto& batch : extraSprites)
       r.draw(r.quad, *batch.second, batch.first, 1);
@@ -642,6 +679,8 @@ public:
     r.draw(r.quad, siegeSprayDroplets, r.white, 25);
     r.draw(r.quad, worldLetters, r.font, 15);
     r.draw(r.quad, gunLetters, r.font, 18);
+    for (auto& pass : extraDraws)
+      r.draw(*pass.mesh, &pass.data, 1, pass.texture, pass.mode);
   }
 };
 } // namespace arsenal

@@ -3,6 +3,8 @@
 #include "turret_slots.hpp"
 #include "manual_arsenal.hpp"
 #include "coffee.hpp"
+#include "service_charges.hpp"
+#include "energy_shield.hpp"
 #include <deque>
 
 namespace command {
@@ -79,11 +81,20 @@ enum class Upgrade {
   FlameDamage,
   FlameRate,
   FlameRange,
+  ServiceRecharge,
+  ServiceStorage,
+  EnergyShield,
+  ShieldCapacity,
+  ShieldRegeneration,
+  ShieldRebuild,
   Count
 };
 enum class Rarity { Common, Uncommon, Rare, Epic, Legendary };
 inline constexpr bool isGlobalTowerUpgrade(Upgrade u) {
   return u == Upgrade::TowerDamage || u == Upgrade::TowerRate || u == Upgrade::TowerRange;
+}
+inline constexpr bool isShieldUpgrade(Upgrade u) {
+  return u >= Upgrade::ShieldCapacity && u <= Upgrade::ShieldRebuild;
 }
 inline constexpr bool isTypedTowerUpgrade(Upgrade u) {
   return u >= Upgrade::LaserDamage && u <= Upgrade::FlameRange;
@@ -120,13 +131,18 @@ inline constexpr int fixedRarity(Upgrade u) {
   case Upgrade::TeslaTower:
   case Upgrade::LanceTower:
   case Upgrade::FrostSupportTower:
+  case Upgrade::ServiceCredit:
+  case Upgrade::ServiceStorage:
     return int(Rarity::Rare);
+  case Upgrade::ServiceRecharge:
+    return int(Rarity::Uncommon);
   case Upgrade::CoffeeII:
     return int(Rarity::Common);
   case Upgrade::CoffeeIII:
   case Upgrade::CoffeeMachineII:
     return int(Rarity::Rare);
   case Upgrade::CoffeeIV:
+  case Upgrade::EnergyShield:
     return int(Rarity::Epic);
   case Upgrade::CoffeeV:
   case Upgrade::CoffeeMachineIII:
@@ -220,7 +236,7 @@ inline constexpr bool uniqueUpgrade(Upgrade u) {
     return true;
   return u == Upgrade::Frost || u == Upgrade::Focus || u == Upgrade::Purge ||
          u == Upgrade::RoverFactory || u == Upgrade::PlasmaMortar || u == Upgrade::ExtremeCooling ||
-         u == Upgrade::UraniumReserve;
+         u == Upgrade::UraniumReserve || u == Upgrade::ServiceCredit || u == Upgrade::EnergyShield;
 }
 struct UpgradeInfo {
   const char* name;
@@ -302,9 +318,9 @@ inline constexpr UpgradeInfo UPGRADES[] = {
      {.3f, 1, .8f}},
     {"Większa seria", "PRODUKCJA JEŹDZIKÓW", "", {.5f, 1, .7f}},
     {"Szybsza linia", "PRODUKCJA JEŹDZIKÓW", "", {1, .75f, .3f}},
-    {"Punkt usług",
-     "JEDNORAZOWE WSPARCIE",
-     "+1 punkt do wydania przy prawym komputerze na Brimstone, falę ogłuszającą lub przeciążenie.",
+    {"Łącze wsparcia orbitalnego",
+     "ODBLOKOWANIE USŁUG",
+     "Włącza prawy komputer. Brimstone, paraliż i cyberświnie: po jednym użyciu, odnawianym co 4 minuty.",
      {.3f, .62f, 1}},
     {"Laserowy moździerz",
      "EKSPERYMENTALNA TECHNOLOGIA PLAZMOWA",
@@ -483,6 +499,18 @@ inline constexpr UpgradeInfo UPGRADES[] = {
      "ROZWÓJ TYPU WIEŻYCZKI",
      "Kolejny poziom parametrów wybranego typu obrony.",
      {.4f, .8f, 1}},
+    {"Szybsze ładowanie usług", "WSPARCIE ORBITALNE",
+     "+30% bazowego tempa ładowania każdej usługi. Maksymalnie 5 ulepszeń.", {.3f,.65f,1}},
+    {"Magazyn wsparcia", "WSPARCIE ORBITALNE",
+     "+1 maksymalny zapas każdej usługi. Maksymalnie 3 ulepszenia; ładowanie pozostaje osobne.", {.4f,.85f,1}},
+    {"Tarcza energetyczna", "JAN KOWALSKI COMPANY",
+     "Dostawa generatora przez drona. Tarcza 1000 HP, regeneracja 10 HP/s. Po zniszczeniu odbudowa 60 s.", {.3f,.75f,1}},
+    {"Tarcza / pojemność", "TARCZA ENERGETYCZNA",
+     "Zwiększa maksymalne HP tarczy. Pięć poziomów Common -> Legendary.", {.3f,.75f,1}},
+    {"Tarcza / regeneracja", "TARCZA ENERGETYCZNA",
+     "Zwiększa regenerację tarczy. Pięć poziomów Common -> Legendary.", {.3f,.75f,1}},
+    {"Tarcza / odbudowa", "TARCZA ENERGETYCZNA",
+     "Skraca czas wyłączenia po zniszczeniu. Pięć poziomów Common -> Legendary.", {.3f,.75f,1}},
 };
 static_assert(std::size(UPGRADES) == size_t(Upgrade::Count));
 inline float typedTowerBonus(Upgrade u, Rarity rarity) {
@@ -516,6 +544,12 @@ inline std::string upgradeDescription(Upgrade u, Rarity rarity) {
     return "+" + percent(250) + " maksymalnego HP i tyle samo naprawy.";
   case Upgrade::Nanobots:
     return "+" + percent(1) + " HP/s stałej regeneracji rdzenia. Premie sumują się.";
+  case Upgrade::ShieldCapacity:
+    return "+" + percent(250) + " maksymalnego HP tarczy. Brak darmowej naprawy; nową pojemność uzupełnia regeneracja.";
+  case Upgrade::ShieldRegeneration:
+    return "+" + percent(2) + " HP/s regeneracji tarczy.";
+  case Upgrade::ShieldRebuild:
+    return "Odbudowa zniszczonej tarczy krótsza o " + percent(5) + " s. Minimum 20 s.";
   case Upgrade::TowerDamage:
     return "+" + percent(20) +
            "% bazowych obrażeń wszystkich wieżyczek, także przyszłych. Wzmacnia ogień i truciznę.";
@@ -551,6 +585,8 @@ struct Expedition {
   bool enabled = false, shipping = false;
   float hp = 1500, maxHp = 1500, uranium = 0, miningMultiplier = 1, flightAge = 0;
   float regeneration = 3;
+  EnergyShield shield;
+  float lastHullDamage = 0;
   int shipments = 0, earned = 0, awaitingPickup = 0, selected = 0, luck = 0;
   bool purgeUsed = false;
   bool miningStarted = false;
@@ -558,10 +594,11 @@ struct Expedition {
   bool manualMinigun = false;
   bool manualLance = false;
   Gun manualKind = Gun::Pulse;
-  int servicePoints = 0;
+  ServiceCharges support;
   int coffeeTier = 1, coffeeMachineTier = 1;
   float activeTime = 0;
   int offersWithoutCombat = 0, uraniumOffers = 0;
+  bool serviceUnlockOffered = false;
   std::array<bool, TowerTypeCount> towerUnlocked{};
   uint64_t rewardSerial = 0;
   int crystalRewards = 0, roverBatch = 6;
@@ -618,6 +655,10 @@ struct Expedition {
   bool eligible(Upgrade u) const {
     if (u < Upgrade::Damage || u >= Upgrade::Count)
       return false;
+    if (isShieldUpgrade(u))
+      return shield.purchased && levels[size_t(u)] < 5;
+    if (u == Upgrade::ServiceRecharge || u == Upgrade::ServiceStorage)
+      return support.unlocked && levels[size_t(u)] < (u == Upgrade::ServiceRecharge ? 5 : 3);
     if (isGlobalTowerUpgrade(u))
       return levels[size_t(u)] < 5;
     if (isTypedTowerUpgrade(u)) {
@@ -664,7 +705,7 @@ struct Expedition {
       }
   }
   Rarity effectiveRarity(Upgrade u, Rarity requested) const {
-    if (isTypedTowerUpgrade(u))
+    if (isTypedTowerUpgrade(u) || isShieldUpgrade(u))
       return Rarity(std::clamp(levels[size_t(u)], 0, 4));
     if (fixedRarity(u) >= 0)
       return Rarity(fixedRarity(u));
@@ -676,7 +717,7 @@ struct Expedition {
   }
   bool eligible(Upgrade u, Rarity rarity) const {
     return eligible(u) && minimumRarity(u) <= rarity &&
-           (!isTypedTowerUpgrade(u) || int(rarity) == levels[size_t(u)]) &&
+           ((!isTypedTowerUpgrade(u) && !isShieldUpgrade(u)) || int(rarity) == levels[size_t(u)]) &&
            (fixedRarity(u) < 0 || fixedRarity(u) == int(rarity)) &&
            ((u != Upgrade::FlatDamage && u != Upgrade::Luck) || rarity == Rarity::Common) &&
            (u != Upgrade::ServiceCredit || rarity == Rarity::Rare);
@@ -745,6 +786,23 @@ struct Expedition {
       offer.choices[card] = pool[rewardRandom.next() % uint32_t(count)];
       offer.rarities[card] = rarity;
     }
+    bool hasServiceUnlock = std::find(offer.choices.begin(), offer.choices.end(),
+                                    Upgrade::ServiceCredit) != offer.choices.end();
+    // Guarantee a choice by the fifth natural offer, across uranium and crystal rewards.
+    // Keep an existing combat tower choice, including the first-payout guarantee.
+    if (!serviceUnlockOffered && !hasServiceUnlock && rewardSerial == 5 &&
+        !support.unlocked && eligible(Upgrade::ServiceCredit)) {
+      int slot = 2;
+      for (int i = 2; i >= 0; --i)
+        if (!isTower(offer.choices[i]) || isSupport(towerWeapon(offer.choices[i]))) {
+          slot = i;
+          break;
+        }
+      offer.choices[slot] = Upgrade::ServiceCredit;
+      offer.rarities[slot] = Rarity::Rare;
+      hasServiceUnlock = true;
+    }
+    serviceUnlockOffered |= hasServiceUnlock;
     bool hasCombat = std::any_of(offer.choices.begin(), offer.choices.end(), [](Upgrade u) {
       return isTower(u) && !isSupport(towerWeapon(u));
     });
@@ -785,9 +843,13 @@ struct Expedition {
       return;
     if (miningStarted)
       activeTime += dt;
-    hp = std::max(0.f, hp - std::max(0.f, damage));
+    shield.step(dt);
+    lastHullDamage = shield.absorb(damage);
+    hp = std::max(0.f, hp - lastHullDamage);
     if (dead())
       return;
+    if (miningStarted)
+      support.step(dt);
     hp = std::min(maxHp, hp + regeneration * dt);
     uranium += rate() * dt;
     // Each full bar pays immediately; physical collection has its own queue.

@@ -1,6 +1,7 @@
 #pragma once
 #include "expedition.hpp"
 #include "rover_factories.hpp"
+#include "enemy_mutations.hpp"
 
 namespace command {
 enum class CrystalState { Ground, Queued, Carried };
@@ -58,6 +59,20 @@ struct Frontier {
   std::array<uint64_t, SpeciesCount> spawned{};
   uint64_t crystalSerial = 0, roversMade = 0, roverHits = 0;
   int bossesSpawned = 0, eliteSpawned = 0, collected = 0;
+  EnemyMutationSystem mutations;
+  int bossWaves = 0, bossBurstRemaining = 0;
+  float bossBurstClock = 0;
+  double regularQuantityCarry = 0, hordeQuantityCarry = 0;
+  static float bossInterval(int completedWaves) {
+    return float(std::max(30,180-30*completedWaves));
+  }
+  int swarmCount(const Game& g,int base,bool horde=false) {
+    double& carry=horde?hordeQuantityCarry:regularQuantityCarry;
+    double exact=base*(1.0+g.enemyGenome.quantityBonus)+carry;
+    int total=int(std::floor(exact+1e-6));
+    carry=std::max(0.0,exact-total);
+    return total;
+  }
   float nextBoss = 180, nextElite = 90, respiteUntil = 0, productionClock = 0;
   float nextHorde = 600, hordeClock = 0;
   int pendingHorde = 0;
@@ -204,18 +219,22 @@ struct Frontier {
   }
   static float spawnSpeed(Species type, float time, bool elite = false) {
     constexpr float speeds[] = {
-        3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f, WYRM_FORWARD_SPEED, 2.8f, 3, 2.8f};
+        3.2f, 6.5f, 2.4f, 3.4f, 5.8f, 5, 3, 2.4f, 2.8f, 2.6f, WYRM_FORWARD_SPEED, 2.8f, 3, 2.8f,
+        TunnelerBody::FORWARD};
     static_assert(std::size(speeds) == SpeciesCount);
     return (speeds[type] + (type <= Runner ? std::min(time / 120, 4.f) : 0)) *
            (elite && type != Saboteur ? .9f : 1.f);
   }
   int spawnFoe(Game& g, Species type, float x, float z, bool elite = false) {
+    if (!elite && type < Titan && type != Saboteur && g.enemyGenome.eliteBrood &&
+        g.mutationRandom.unit()<.05f) elite=true;
+    if (elite && type < Titan && g.time < g.enemyGenome.saboteurWaveUntil)
+      type = Saboteur;
     int id = g.spawn(type, x, z);
     if (id < 0)
       return id;
     auto& foe = g.foes[id];
-    foe.hp = foe.maxHp = spawnHp(type, g.time, elite);
-    foe.speed = spawnSpeed(type, g.time, elite);
+    g.setEnemyBaseStats(id,spawnHp(type,g.time,elite),spawnSpeed(type,g.time,elite));
     foe.elite = elite || type == Saboteur;
     if (foe.elite) {
       if (type != Saboteur)
@@ -240,25 +259,34 @@ struct Frontier {
     return Crawler;
   }
   void stepWaves(Game& g, float dt, float& spawnTimer) {
+    mutations.step(g,dt);
     if (!bossWarning && g.time >= nextBoss - 10) {
       bossWarning = true;
       g.announce("ALARM: duża sygnatura. Boss nadejdzie za 10 sekund.");
     }
     bool added = false;
-    if (g.time >= nextBoss) {
+    if (g.time >= nextBoss && bossBurstRemaining == 0) {
+      bossBurstRemaining = 1+g.enemyGenome.extraBosses;
+      ++bossWaves;
+      nextBoss += bossInterval(bossWaves);
+      bossBurstClock = 0;
+      bossWarning = false;
+    }
+    bossBurstClock -= dt;
+    if (bossBurstRemaining > 0 && bossBurstClock <= 0) {
       int id = g.boss();
       if (id >= 0) {
         auto& boss = g.foes[id];
-        boss.hp = boss.maxHp = boss.type >= Wyrm ? SPECIES[boss.type].hp
+        float hp = boss.type >= Wyrm ? SPECIES[boss.type].hp
                                                  : (boss.type == Titan   ? 7000.f
                                                     : boss.type == Brain ? 8000.f
                                                                          : 6000.f) +
                                                        bossesSpawned * 1500;
-        boss.speed = spawnSpeed(boss.type, g.time);
+        g.setEnemyBaseStats(id,hp,spawnSpeed(boss.type,g.time));
         ++spawned[boss.type];
         ++bossesSpawned;
-        nextBoss += 180;
-        bossWarning = false;
+        --bossBurstRemaining;
+        bossBurstClock = 2;
         added = true;
       }
     }
@@ -275,7 +303,8 @@ struct Frontier {
       float interval =
           g.time < 60 ? 2.8f - g.time * .006f : std::max(.6f, 2.44f - (g.time - 60) * .0024f);
       spawnTimer = interval * (respite ? 3 : 1);
-      int group = respite ? 1 : 1 + std::min(7, int(g.time / 240));
+      int baseGroup = 1+std::min(7,int(g.time/240));
+      int group = respite ? 1 : swarmCount(g,baseGroup);
       for (int i = 0; i < group && g.active.size() < MAX_ACTIVE; ++i) {
         float a = g.random.unit() * 2 * PI,
               r = SPAWN_MIN + g.random.unit() * (SPAWN_MAX - SPAWN_MIN);
@@ -286,13 +315,13 @@ struct Frontier {
     if (g.time >= nextHorde) {
       // Queue the burst, then release at most 12 foes per frame.
       pendingHorde = std::min(
-          2400, pendingHorde + std::min(600, 120 + 30 * int(std::max(0.f, g.time - 600) / 60)));
+          2400, pendingHorde + swarmCount(g,std::min(600,120+30*int(std::max(0.f,g.time-600)/60)),true));
       nextHorde = g.time + 15;
     }
     hordeClock -= dt;
     if (pendingHorde > 0 && hordeClock <= 0 && g.time >= respiteUntil) {
       hordeClock = .08f;
-      int count = std::min({12, pendingHorde, MAX_ACTIVE - int(g.active.size())});
+      int count = std::max(0,std::min({12, pendingHorde, MAX_ACTIVE - int(g.active.size())}));
       for (int i = 0; i < count; ++i) {
         float a = float(hordeSpawned % 3) * (2 * PI / 3) + float(int(g.time / 15)) * .71f +
                   (g.random.unit() - .5f) * .8f;
@@ -353,19 +382,20 @@ struct Frontier {
       auto& rover = rovers[i];
       rover.life -= dt;
       rover.searchClock -= dt;
-      if (!g.valid(rover.target, rover.generation) && rover.searchClock <= 0) {
-        rover.target = g.grid.nearest(rover.position.x, rover.position.z, 650, g.foes);
+      if ((!g.valid(rover.target, rover.generation) || !g.targetable(rover.target)) && rover.searchClock <= 0) {
+        rover.target = g.nearestTarget(rover.position.x, rover.position.z, 650);
         rover.generation = rover.target >= 0 ? g.foes[rover.target].generation : 0;
         rover.searchClock = .2f;
       }
       bool impact = false;
-      if (g.valid(rover.target, rover.generation)) {
+      if (g.valid(rover.target, rover.generation) && g.targetable(rover.target)) {
         auto& foe = g.foes[rover.target];
-        Vec3 delta{foe.x - rover.position.x, 0, foe.z - rover.position.z};
+        auto point = g.targetPoint(rover.target, rover.position);
+        Vec3 delta{point.x - rover.position.x, 0, point.z - rover.position.z};
         float distance = length(delta), contact = foe.size * .43f + .35f;
         float step = ROVER_SPEED * (.92f + float(rover.serial % 17) * .01f) * dt;
         if (distance <= step + contact) {
-          Vec3 hit = g.targetPoint(rover.target);
+          Vec3 hit = point;
           roverDamage += g.blast(hit, ROVER_RADIUS, ROVER_DAMAGE, Rocket, .55f, false);
           ++roverHits;
           impact = true;

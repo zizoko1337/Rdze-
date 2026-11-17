@@ -61,9 +61,13 @@ int main() {
       for (int c : counts)
         require(c > 0, "Rarity never rolls");
       for (int i = 0; i < int(Upgrade::Count); ++i)
-        if (Upgrade(i) != Upgrade::RoverBatch && Upgrade(i) != Upgrade::RoverRate)
+        if (Upgrade(i) != Upgrade::RoverBatch && Upgrade(i) != Upgrade::RoverRate &&
+            Upgrade(i) != Upgrade::ServiceRecharge && Upgrade(i) != Upgrade::ServiceStorage &&
+            !isShieldUpgrade(Upgrade(i)))
           require(seen[i], "Upgrade unreachable from normal mining rewards");
       e.levels[size_t(Upgrade::RoverFactory)] = 1;
+      e.support.unlock();
+      e.shield.order();
       for (int n = 0; n < 500; ++n) {
         e.addReward();
         for (auto u : e.rewards.back().choices)
@@ -72,6 +76,10 @@ int main() {
       }
       require(seen[size_t(Upgrade::RoverBatch)] && seen[size_t(Upgrade::RoverRate)],
               "Production upgrades never appear after factory unlock");
+      require(seen[size_t(Upgrade::ServiceRecharge)] && seen[size_t(Upgrade::ServiceStorage)],
+              "Support upgrades never appear after terminal unlock");
+      for (auto u : {Upgrade::ShieldCapacity, Upgrade::ShieldRegeneration, Upgrade::ShieldRebuild})
+        require(seen[size_t(u)], "Shield upgrades never appear after generator purchase");
       Expedition first(true, true);
       first.step(50, 0);
       require(std::any_of(first.rewards.front().choices.begin(),

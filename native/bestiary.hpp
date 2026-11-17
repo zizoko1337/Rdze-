@@ -15,7 +15,8 @@ inline constexpr const char* ENEMY_ROLES[] = {"RÓJ",
                                               "BOSS / ZYGZAK",
                                               "BOSS / PODZIAŁ",
                                               "BOSS / WCHŁANIANIE",
-                                              "BOSS / ARTYLERIA"};
+                                              "BOSS / ARTYLERIA",
+                                              "BOSS / DRĄŻENIE"};
 inline constexpr const char* ENEMY_BEHAVIOR[] = {
     "Atakuje rdzeń: 4 obrażenia/s.",
     "Szybki szturm. Rdzeń: 4 obrażenia/s.",
@@ -27,14 +28,20 @@ inline constexpr const char* ENEMY_BEHAVIOR[] = {
     "Rdzeń: 80 obrażeń/s. Co 6 s uderza za dodatkowe 30 obrażeń.",
     "Rdzeń: 80 obrażeń/s. Co 8 s przywołuje 5 łowców.",
     "Co 6 s wyłącza wieżyczki na 4 s. Promień 42 m (2 heksy).",
-    "Do rdzenia 3,2 m/s. Szeroki, szybki zygzak. Głowa i 8 segmentów, wspólne HP.",
+    "Do rdzenia 3,2 m/s, na boki do 72 m/s. Segmenty odtwarzają trasę głowy jak Snake.",
     "8000 -> 2 x 4000 -> 4 x 2000 HP. Razem 24000. Kryształ po całym podziale.",
     "Przy 75/50/25% HP raz wchłania obecnych wrogów do 50 m i ich pozostałe HP.",
-    "Zasięg 63 m. Ciągły rozpylacz kwasu z trąby: 40 obrażeń/s."};
+    "Zasięg 63 m. Ciągły rozpylacz kwasu z trąby: 40 obrażeń/s.",
+    "32 segmenty. Nurkuje po sinusoidzie. Zwrot przy 70/40/10% HP. Pod ziemią działa tylko trucizna."};
 static_assert(std::size(ENEMY_ROLES) == SpeciesCount && std::size(ENEMY_BEHAVIOR) == SpeciesCount);
 
 // No renderer dependency in spawn logic, allowing the actual menu action to be tested headlessly.
 struct Bestiary {
+  static constexpr int COLUMNS = (SpeciesCount + 1) / 2;
+  static int otherRow(int selected) {
+    int other = (selected + COLUMNS) % (COLUMNS * 2);
+    return other < SpeciesCount ? other : selected;
+  }
   int selected = 0, count = 1;
   uint64_t serial = 0;
   std::string notice;
@@ -62,8 +69,8 @@ struct Bestiary {
     return made;
   }
   static Rect card(const GameUi& ui, int index) {
-    float width = (ui.width - 100) / 7;
-    return {50 + index % 7 * width, 153 + index / 7 * 323.f, width - 12, 309};
+    float width = (ui.width - 100) / COLUMNS;
+    return {50 + index % COLUMNS * width, 153 + index / COLUMNS * 323.f, width - 12, 309};
   }
   static Rect batch(const GameUi& ui, int index) {
     return {ui.width - 420 + index * 120.f, 88, 110, 41};
@@ -88,7 +95,7 @@ struct Bestiary {
     ui.rect(r, {0, 0, ui.width, ui.height}, {.009f, .018f, .03f}, .98f);
     ui.text(r, 50, 35, "BESTIARIUSZ / SYMULATOR ZAGROŻEŃ", 30, GameUi::mint);
     ui.text(r, 50, 92, "['] / Esc: zamknij  |  Kliknij bestię: przywołaj", 16, GameUi::white);
-    ui.text(r, 50, 121, "HP i prędkość dla bieżącego czasu wyprawy. Czas stoi podczas wyboru.", 12,
+    ui.text(r, 50, 121, "HP i prędkość przywołań z bieżącymi mutacjami. Czas stoi podczas wyboru.", 12,
             GameUi::muted);
     constexpr int batches[] = {1, 10, 100};
     for (int i = 0; i < 3; ++i) {
@@ -127,8 +134,10 @@ struct Bestiary {
       r.draw(r.quad, &image, 1, scene.textures[i], 16);
       ui.text(r, b.x + 12, b.y + 155, SPECIES[i].name, 13, GameUi::white);
       ui.text(r, b.x + 12, b.y + 181,
-              "HP " + std::to_string(int(Frontier::spawnHp(type, s.world.time))) + "  |  " +
-                  number(Frontier::spawnSpeed(type, s.world.time), 1) + " m/s",
+              "HP " + std::to_string(int(Frontier::spawnHp(type, s.world.time)*(1+s.world.enemyGenome.hpBonus)*
+                                        (type >= Titan && s.world.enemyGenome.nextBossHealth ? 2.f : 1.f))) + "  |  " +
+                  number(Frontier::spawnSpeed(type, s.world.time)*s.world.enemySpeedMultiplier(type)*
+                         (type >= Titan && s.world.enemyGenome.nextBossSpeed ? 2.f : 1.f), 1) + " m/s",
               11, c);
       ui.paragraph(r, b.x + 12, b.y + 207, ENEMY_BEHAVIOR[i], int((b.w - 24) / 6.5f), 11,
                    GameUi::muted);

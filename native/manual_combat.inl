@@ -12,8 +12,8 @@ void updateSmartTarget() {
   uint32_t generation = 0;
   Vec3 f = forward(), right = normalize(cross({0, 1, 0}, f)), up = cross(f, right);
   float best = 1e30f;
-  world.grid.radius(eye().x, eye().z, module.spec().range, world.foes, [&](int id) {
-    Vec3 delta = world.targetPoint(id) - eye();
+  world.targetsNear(eye().x, eye().z, module.spec().range, [&](int id) {
+    Vec3 delta = world.targetPoint(id, eye()) - eye();
     float depth = dot(delta, f);
     if (depth < 1 || length(delta) > module.spec().range)
       return;
@@ -88,14 +88,16 @@ void fireSupportArc() {
     target = -1;
   }
 }
-void manualHit(int id, float damage, Weapon source, bool focus = true) {
+void manualHit(int id, float damage, Weapon source, bool focus = true,
+               DamageClass damageClass = DamageClass::Direct, int part = -2) {
   if (id < 0 || world.foes[id].hp <= 0)
     return;
   if (focus)
     markTarget(id);
-  world.hurt(id, damage, source);
-  ++impacts;
-  hitFlash = .14f;
+  if (world.hurt(id, damage, source, true, damageClass, part) > 0) {
+    ++impacts;
+    hitFlash = .14f;
+  }
 }
 void manualBlast(Vec3 point, float radius, float damage, Weapon source, int primary = -1) {
   markTarget(primary >= 0 && world.foes[primary].hp > 0
@@ -103,9 +105,9 @@ void manualBlast(Vec3 point, float radius, float damage, Weapon source, int prim
                  : world.grid.nearest(point.x, point.z, radius, world.foes));
   world.blastTargets(point, radius, [&](int id, float) {
     // A ground blast reaches tall enemies but not a distant airborne centre.
-    if (world.foes[id].type == Wyrm ||
+    if (world.foes[id].type == Wyrm || world.foes[id].type == Tunneler ||
         length(world.targetPoint(id) - point) <= radius + world.foes[id].size * .25f)
-      manualHit(id, damage, source, false);
+      manualHit(id, damage, source, false, DamageClass::Area);
   });
   world.ring(point, WEAPONS[source].color, radius, .65f);
   world.sparks(point + Vec3{0, 1, 0}, WEAPONS[source].color, 28, 28);
@@ -122,10 +124,10 @@ void fireArc() {
   auto nearest = [&](Vec3 origin) {
     int result = -1;
     float best = 56 * 56;
-    world.grid.radius(origin.x, origin.z, 56, world.foes, [&](int candidate) {
+    world.targetsNear(origin.x, origin.z, 56, [&](int candidate) {
       if (std::find(visited.begin(), visited.begin() + count, candidate) != visited.begin() + count)
         return;
-      Vec3 d = world.targetPoint(candidate) - origin;
+      Vec3 d = world.targetPoint(candidate, origin) - origin;
       float distance = dot(d, d);
       if (distance < best) {
         best = distance;
@@ -146,14 +148,14 @@ void fireArc() {
     id = nearest(from);
   }
   while (id >= 0 && count < int(visited.size())) {
-    Vec3 to = world.targetPoint(id);
+    Vec3 to = world.targetPoint(id, from);
     Vec3 mid = (from + to) * .5f;
     mid = mid + Vec3{(random.unit() - .5f) * 2, 1 + random.unit(), (random.unit() - .5f) * 2};
     world.beam(from, mid, module.spec().color, .18f, .22f);
     world.beam(mid, to, module.spec().color, .18f, .22f);
     world.beam(from, to, {1, 1, 1}, .045f, .12f);
     visited[count++] = id;
-    manualHit(id, manualDamage(), Tesla, firstTarget);
+    manualHit(id, manualDamage(), Tesla, firstTarget, DamageClass::Direct, world.aimPart(id, from));
     firstTarget = false;
     from = to;
     id = nearest(from);
@@ -172,6 +174,7 @@ void fireRail() {
   Vec3 mid = origin + direction * (range * .5f);
   world.grid.radius(mid.x, mid.z, std::hypot(direction.x, direction.z) * range * .5f + 16,
                     world.foes, [&](int id) {
+                      if (world.foes[id].type == Tunneler) return;
                       Vec3 delta = origin - world.targetPoint(id);
                       float r = world.foes[id].size * .43f, b = dot(delta, direction);
                       float discriminant = b * b - dot(delta, delta) + r * r;
@@ -187,6 +190,14 @@ void fireRail() {
                         }
                     });
   // Include the worm body once in the piercing list, sharing the head's ID.
+  for (const auto& body : world.tunnelers) {
+    auto hit = traceTunneler(world, body, origin, direction, range);
+    if (hit.id >= 0 && hit.distance < hits.back().distance) {
+      hits.back() = hit;
+      std::sort(hits.begin(), hits.end(),
+                [](const RayHit& a, const RayHit& b) { return a.distance < b.distance; });
+    }
+  }
   for (const auto& body : world.worms) {
     if (!world.valid(body.head, body.generation))
       continue;
@@ -219,7 +230,7 @@ void fireRail() {
   for (const auto& hit : hits)
     if (hit.id >= 0) {
       float distance = length(world.targetPoint(hit.id) - origin);
-      manualHit(hit.id, sniperDamageAt(distance), Sniper, primary);
+      manualHit(hit.id, sniperDamageAt(distance), Sniper, primary, DamageClass::Direct, hit.part);
       primary = false;
       world.sparks(hit.point, module.spec().color, 8, 8);
     }
@@ -239,10 +250,11 @@ void fireFlameCone(bool focused) {
   if (hit.id >= 0 &&
       std::hypot(world.foes[hit.id].x - eye().x, world.foes[hit.id].z - eye().z) <= range)
     markTarget(hit.id);
-  world.grid.radius(eye().x, eye().z, range, world.foes, [&](int id) {
-    Vec3 d = world.targetPoint(id) - eye();
+  world.targetsNear(eye().x, eye().z, range, [&](int id) {
+    Vec3 d = world.targetPoint(id, eye()) - eye();
     if (dot(normalize(d), f) >= std::cos(halfAngle)) {
-      manualHit(id, manualDamage() * module.spec().interval, arsenal::Flame, false);
+      manualHit(id, manualDamage() * module.spec().interval, arsenal::Flame, false, DamageClass::Area,
+                world.aimPart(id, eye()));
       auto& foe = world.foes[id];
       foe.burn = std::max(foe.burn, 3.f);
       foe.burnDps = std::max(foe.burnDps, 30 * module.damageMultiplier);
@@ -269,16 +281,16 @@ void stepToxicPatches(float dt) {
     patch.life -= tick;
     patch.tick += tick;
     if (patch.tick >= .1f || patch.life <= .00001f) {
-      world.grid.radius(patch.position.x, patch.position.z, 14, world.foes, [&](int id) {
-        if (world.foes[id].altitude <= 6) {
+      world.targetsNear(patch.position.x, patch.position.z, 14, [&](int id) {
+        if (world.foes[id].type == Tunneler || world.foes[id].altitude <= 6) {
           if (patch.glue)
             world.foes[id].glued = std::max(world.foes[id].glued, .16f);
           else
             world.foes[id].toxicSlow = .16f;
           world.foes[id].poison = 6;
-          manualHit(id, patch.damage * patch.tick, Venom, false);
+          manualHit(id, patch.damage * patch.tick, Venom, false, DamageClass::Persistent);
         }
-      });
+      }, true);
       patch.tick = 0;
     }
     if (patch.life <= .00001f) {
@@ -336,8 +348,8 @@ void stepManualProjectiles(float dt) {
     p.previous = p.pos;
     bool impact = false;
     if (p.kind == Gun::Smart) {
-      if (world.valid(p.target, p.generation))
-        p.endpoint = world.targetPoint(p.target);
+      if (world.valid(p.target, p.generation) && world.targetable(p.target))
+        p.endpoint = world.targetPoint(p.target, p.pos);
       Vec3 delta = p.endpoint - p.pos;
       float distance = length(delta), speed = GUNS[int(Gun::Smart)].speed;
       Vec3 desired = normalize(delta) * speed;
@@ -362,7 +374,7 @@ void stepManualProjectiles(float dt) {
         // One vertical energy strike per endpoint. No area damage and no per-frame target search.
         auto hit = trace(world, p.endpoint + Vec3{0, 60, 0}, {0, -1, 0}, 60, PlasmaSpec::hitRadius);
         if (hit.id >= 0) {
-          manualHit(hit.id, p.damage, Laser, p.emitter == 0);
+          manualHit(hit.id, p.damage, Laser, p.emitter == 0, DamageClass::Direct, hit.part);
           world.beam(p.pos + Vec3{0, 4, 0}, hit.point, {.2f, .95f, 1}, .13f, .12f);
         }
         world.sparks(hit.point, {.2f, .95f, 1}, 4, 5);
@@ -458,9 +470,10 @@ void stepLance(float dt, bool held) {
   if (hit.id >= 0 && tick > 0) {
     if (lanceTouched[hit.id] != world.foes[hit.id].generation) {
       lanceTouched[hit.id] = world.foes[hit.id].generation;
-      manualHit(hit.id, 200 * module.damageMultiplier + flatDamage, arsenal::Lance);
+      manualHit(hit.id, 200 * module.damageMultiplier + flatDamage, arsenal::Lance, true,
+                DamageClass::Direct, hit.part);
     }
-    manualHit(hit.id, manualDamage() * tick, arsenal::Lance);
+    manualHit(hit.id, manualDamage() * tick, arsenal::Lance, true, DamageClass::Direct, hit.part);
   }
   shotFlash = .08f;
   recoil = .25f;

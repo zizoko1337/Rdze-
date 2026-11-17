@@ -62,6 +62,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Enemy tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Boss test compilation failed.' }
 & (Join-Path $out 'boss-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Boss tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'worm_path_tests.cpp') '-o' (Join-Path $out 'worm-path-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Worm path test compilation failed.' }
+& (Join-Path $out 'worm-path-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Worm path tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'tunneler_tests.cpp') '-o' (Join-Path $out 'tunneler-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Tunneler test compilation failed.' }
+& (Join-Path $out 'tunneler-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Tunneler tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'coffee_tests.cpp') '-o' (Join-Path $out 'coffee-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Coffee test compilation failed.' }
 & (Join-Path $out 'coffee-tests.exe')
@@ -70,6 +78,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Coffee tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Core test compilation failed.' }
 & (Join-Path $out 'core-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Core tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'energy_shield_tests.cpp') '-o' (Join-Path $out 'energy-shield-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Energy shield test compilation failed.' }
+& (Join-Path $out 'energy-shield-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Energy shield tests failed.' }
 & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot 'base_revision_tests.cpp') '-o' (Join-Path $out 'base-revision-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Base revision test compilation failed.' }
 & (Join-Path $out 'base-revision-tests.exe')
@@ -94,6 +106,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Support tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Frontier test compilation failed.' }
 & (Join-Path $out 'frontier-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Frontier tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'enemy_mutation_tests.cpp') '-o' (Join-Path $out 'enemy-mutation-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Enemy mutation test compilation failed.' }
+& (Join-Path $out 'enemy-mutation-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Enemy mutation tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'next_boss_mutation_tests.cpp') '-o' (Join-Path $out 'next-boss-mutation-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Next boss mutation test compilation failed.' }
+& (Join-Path $out 'next-boss-mutation-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Next boss mutation tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'logistics_tests.cpp') '-o' (Join-Path $out 'logistics-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Logistics tests compilation failed.' }
 & (Join-Path $out 'logistics-tests.exe')
@@ -102,13 +122,18 @@ if ($LASTEXITCODE -ne 0) { throw 'Logistics tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Services test compilation failed.' }
 & (Join-Path $out 'services-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Services tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'cyber_pig_tests.cpp') '-o' (Join-Path $out 'cyber-pig-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Cyber pig test compilation failed.' }
+& (Join-Path $out 'cyber-pig-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Cyber pig tests failed.' }
 Copy-Item -LiteralPath (Join-Path $sdl 'bin/SDL3.dll') -Destination (Join-Path $out 'SDL3.dll') -Force
 & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot 'music_tests.cpp') '-L' (Join-Path $sdl 'lib') '-lSDL3.dll' '-lole32' '-lmfplat' '-lmfreadwrite' '-lmfuuid' '-o' (Join-Path $out 'music-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Radio test compilation failed.' }
 & (Join-Path $out 'music-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Radio tests failed.' }
 if (!$TestsOnly) {
-  $programs = @(@{ Source='game_main.cpp'; Output='rdzen-game.exe' }, @{ Source='render_tests.cpp'; Output='render-tests.exe' })
+  $programs = @(@{ Source='game_main.cpp'; Output='rdzen-game.exe' }, @{ Source='render_tests.cpp'; Output='render-tests.exe' }, @{ Source='tunneler_visual_tests.cpp'; Output='tunneler-visual-tests.exe' })
+  $programs += @{ Source='energy_shield_visual_tests.cpp'; Output='energy-shield-visual-tests.exe' }
   if (!$GameOnly) { $programs += @{ Source='main.cpp'; Output='rdzen-native.exe' } }
   foreach ($program in $programs) {
     & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot $program.Source) '-L' (Join-Path $sdl 'lib') '-lSDL3.dll' '-ld3d11' '-ldxgi' '-ld3dcompiler' '-lole32' '-lwindowscodecs' '-luuid' '-lpsapi' '-lgdi32' '-lmfplat' '-lmfreadwrite' '-lmfuuid' '-o' (Join-Path $out $program.Output)

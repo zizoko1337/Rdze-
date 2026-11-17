@@ -175,7 +175,7 @@ int main() {
       require(s.sentryStock == 9 && s.expedition.chosenTypes(false) == 9,
               "Debug-only technology limit bypass did not grant actual inventory");
       require(s.debugGrant(Upgrade::ServiceCredit, Rarity::Legendary) &&
-                  s.expedition.servicePoints == 1,
+                  s.expedition.support.unlocked && s.expedition.support.total() == 3,
               "Lab service grant does not use actual service inventory");
       require(!s.debugGrant(Upgrade::Count, Rarity::Legendary), "Lab accepts invalid upgrade");
       std::cout << "PASS searchable full catalogue, accent folding, actual grants, preserved "

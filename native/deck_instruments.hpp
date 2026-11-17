@@ -74,7 +74,7 @@ inline void appendCommandConsoles(GameScene& scene, const Session& s) {
   for (float side : {-1.f, 1.f}) {
     InstrumentFrame f{scene, {side * 6.8f, CORE_HEIGHT + .2f, -3.5f}, consoleYaw(side)};
     bool upgrades = side < 0;
-    int count = upgrades ? int(s.expedition.rewards.size()) : s.expedition.servicePoints;
+    int count = upgrades ? int(s.expedition.rewards.size()) : s.expedition.support.total();
     Color accent = upgrades ? mint : cyan;
     if (upgrades) {
       // Pale research station: twin feet, shallow keyboard, wide suspended monitor.
@@ -114,20 +114,29 @@ inline void appendCommandConsoles(GameScene& scene, const Session& s) {
       f.box({0, .1f, .05f}, {3, .2f, 1.65f}, steel);
       f.box({0, 1.29f, -.18f}, {2.95f, .19f, 1.7f}, steel);
       f.box({-.3f, 1.98f, .25f}, {2.05f, 1.32f, .32f}, {.12f, .21f, .29f});
-      f.box({-.3f, 1.98f, .064f}, {1.83f, 1.09f, .04f}, {.008f, .018f, .035f}, true);
+      bool powered = s.expedition.support.unlocked;
+      f.box({-.3f, 1.98f, .064f}, {1.83f, 1.09f, .04f},
+            powered ? Color{.008f,.018f,.035f} : Color{.003f,.004f,.005f}, powered);
       f.box({1.12f, 1.97f, .28f}, {.48f, 1.48f, .55f}, dark);
       for (int i = 0; i < 3; ++i) {
         f.box({1.12f, 1.56f + i * .4f, -.03f}, {.3f, .23f, .1f}, steel);
-        f.rod({1.05f, 1.56f + i * .4f, -.1f}, {1.16f, 1.61f + i * .4f, -.14f}, .035f, amber, true);
+        f.rod({1.05f, 1.56f + i * .4f, -.1f}, {1.16f, 1.61f + i * .4f, -.14f}, .035f, powered ? amber : steel, powered);
       }
-      f.text({-1.1f, 2.38f, .03f}, "ORBITAL / USŁUGI", .105f, cyan);
-      f.text({-1.1f, 2.09f, .03f}, "PUNKTY: " + number(count), .13f, {.7f, .85f, 1});
-      f.text({-1.1f, 1.83f, .03f}, "01 BRIMSTONE\n02 IMPULS\n03 PRZECIĄŻENIE", .09f, cyan);
+      if (powered) {
+        f.text({-1.1f,2.38f,.03f},"ORBITAL / WSPARCIE",.105f,cyan);
+        const char* names[] = {"BRIM", "PARALIZ", "CYBER SWINIE"};
+        for (int i=0;i<3;++i) {
+          const auto& bank = s.expedition.support;
+          std::string status = bank.charges[i] > 0 ? number(bank.charges[i])+"/"+number(bank.capacity())
+                                                   : number(bank.progress[i]*100,0)+"%";
+          f.text({-1.1f,2.12f-i*.23f,.03f},std::string(names[i])+" "+status,.085f,bank.charges[i]>0?cyan:steel);
+        }
+      }
       f.box({0, 1.43f, -.64f}, {2.6f, .16f, .06f}, dark);
-      f.text({-1.12f, 1.45f, -.68f}, count > 0 ? "WSPARCIE GOTOWE [E]" : "BRAK PUNKTÓW USŁUG", .1f,
-             count > 0 ? amber : steel);
+      if (powered)
+        f.text({-1.12f,1.45f,-.68f},count>0?"WSPARCIE GOTOWE [E]":"LADOWANIE WSPARCIA",.1f,count>0?amber:steel);
       for (int i = 0; i < 5; ++i)
-        f.box({-.9f + i * .43f, .7f, -.66f}, {.28f, .035f, .035f}, cyan, true);
+        f.box({-.9f + i * .43f, .7f, -.66f}, {.28f, .035f, .035f}, powered ? cyan : steel, powered);
     }
     // Real raised keys, shared only on the control deck; housings and screens differ.
     for (int row = 0; row < 3; ++row)

@@ -191,16 +191,20 @@ int main() {
       require(g.worms.size() == 1, "Missing worm body");
       bool left = false, right = false;
       float minX = 0, maxX = 0;
+      float travelled = 0;
       for (int n = 0; n < 180; ++n) {
         float x = g.foes[boss].x;
+        Vec3 before{g.foes[boss].x, 0, g.foes[boss].z};
         tick(g, 1.f / 60);
         left |= g.foes[boss].x < x;
         right |= g.foes[boss].x > x;
         minX = std::min(minX, g.foes[boss].x);
         maxX = std::max(maxX, g.foes[boss].x);
+        travelled += length(Vec3{g.foes[boss].x, 0, g.foes[boss].z} - before);
       }
       float advance = 200 - std::hypot(g.foes[boss].x, g.foes[boss].z);
-      require(left && right && maxX - minX > 20, "Worm side-to-side sway is too narrow");
+      require(left && right && maxX - minX > 70, "Worm side-to-side sway is too narrow");
+      require(travelled > advance * 10, "Sideways motion does not dominate forward motion");
       require(std::abs(advance - g.foes[boss].speed * 3) < .02f && advance < 10,
               "Lateral speed changes normal inward advance");
       Vec3 previous{g.foes[boss].x, 0, g.foes[boss].z};
@@ -216,24 +220,28 @@ int main() {
       g.blast(tail, 4, 100, Mortar);
       require(g.foes[boss].hp == oldHp - 100, "Tail blast must damage shared HP once");
       g.foes[boss].glued = 1;
+      auto stoppedBody = g.worms.front().segments;
       float x = g.foes[boss].x, z = g.foes[boss].z;
       tick(g, .5f);
       require(g.foes[boss].x == x && g.foes[boss].z == z, "Glue does not stop zigzag");
+      for (size_t i = 0; i < stoppedBody.size(); ++i)
+        require(length(g.worms.front().segments[i] - stoppedBody[i]) < .001f,
+                "Stopped head keeps dragging its body");
       g.hurt(boss, 100000, Laser);
       tick(g, .02f);
       require(g.worms.empty(), "Dead worm body not removed");
-      std::cout << "PASS worm zigzag, linked segments, shared hitboxes, glue and cleanup\n";
+      std::cout << "PASS dominant sideways zigzag, Snake body, shared hitboxes, glue and cleanup\n";
     }
     {
       auto game = std::make_unique<Game>(false);
       auto& g = *game;
       g.autoWaves = false;
-      constexpr Species expected[] = {Titan, Queen, Brain, Wyrm, Slime, Devourer, SiegeBoss};
+      constexpr Species expected[] = {Titan, Queen, Brain, Wyrm, Slime, Devourer, SiegeBoss, Tunneler};
       for (auto type : expected) {
         int id = g.boss();
         require(id >= 0 && g.foes[id].type == type, "Natural rotation omits a boss");
       }
-      std::cout << "PASS all seven bosses in natural rotation\n";
+      std::cout << "PASS all eight bosses in natural rotation\n";
     }
     return 0;
   } catch (const std::exception& e) {

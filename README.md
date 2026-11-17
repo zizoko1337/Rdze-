@@ -32,7 +32,7 @@ Celuj myszą i strzelaj **LPM** — można go przytrzymać. Ponowne **E** opuszc
 
 Rdzeń zaczyna z **1500 HP**, wydobywa **2 jednostki uranu/s**, a pasek mieści **100 uranu**. Każde zapełnienie paska natychmiast daje **jedną wypłatę: wybór 1 z 3 różnych kart**. Pierwsza wypłata jest dostępna po około 50 sekundach aktywnej gry. Duży dron odbiera gotowe ładunki niezależnie od wypłat; jego przylot, przejęcie kontenera i odlot trwają 10 sekund. Wydobycie i kolejne wypłaty działają także podczas lotu drona. Ładunki mogą czekać w kolejce do odbioru.
 
-Po wypłatę podejdź do **lewego komputera** na platformie. Popatrz na niego z bliska i naciśnij **E**. Zielona lampka miga, jeśli są dostępne nagrody, a mały ekran pokazuje ich liczbę. Wybierz kartę **1/2/3** lub kliknięciem. Karta jest natychmiast instalowana, a terminal się zamyka. **E/Esc** pozwala wyjść bez wybierania; propozycje pozostają takie same. Wypłaty mogą czekać w kolejce. Otwarcie terminala zatrzymuje walkę, wydobycie i lot transportowca. **Prawy komputer służy osobno do jednorazowych usług.**
+Po wypłatę podejdź do **lewego komputera** na platformie. Popatrz na niego z bliska i naciśnij **E**. Zielona lampka miga, jeśli są dostępne nagrody, a mały ekran pokazuje ich liczbę. Wybierz kartę **1/2/3** lub kliknięciem. Karta jest natychmiast instalowana, a terminal się zamyka. **E/Esc** pozwala wyjść bez wybierania; propozycje pozostają takie same. Wypłaty mogą czekać w kolejce. Otwarcie terminala zatrzymuje walkę, wydobycie i lot transportowca. **Prawy komputer po odblokowaniu obsługuje odnawialne wsparcie orbitalne.**
 
 Jest **71 rodzajów kart** i pięć rzadkości: **Common, Uncommon, Rare, Epic, Legendary**. Kolor i nazwa rzadkości są widoczne na karcie, a opis podaje faktyczną wielkość bonusu. Zamknięcie komputera nie zmienia propozycji ani ich rzadkości. Pierwsza wypłata zawsze zawiera przynajmniej jedną propozycję nowej wieżyczki bojowej.
 
@@ -53,7 +53,9 @@ Na ekspedycję wybierasz maksymalnie **4 różne typy bojowe i 2 różne typy ws
 | Wspólny cel | Manualne trafienie oznacza cel na 3 s; wieżyczki w zasięgu przełączają na niego ostrzał. Cel otrzymuje +0/10/20/30/40% obrażeń zależnie od rzadkości |
 | Awaryjne oczyszczenie | Raz na ekspedycję, przy 50% HP: zabija zwykłe bestie i zadaje bossom 50% ich maksymalnego HP |
 | Fabryka jeździków | 6 dronów dostarcza 6 fabryczek; po podłączeniu produkcja 6 maszyn co 12 s; jeździk szuka najbliższego celu i wybucha w promieniu 4 m, za 180 obrażeń w centrum (mniej bossom) |
-| Punkt usług (tylko Rare) | +1 punkt do wydania przy prawym komputerze na jedną z trzech jednorazowych usług |
+| Łącze wsparcia orbitalnego (Rare, unikalne) | Włącza prawy komputer i daje po jednym użyciu Brimstone, paraliżu i cyberświń. Każda usługa odnawia się osobno co 4 minuty |
+| Szybsze ładowanie usług (Uncommon) | +30% bazowego tempa odnawiania, maks. 5 kart |
+| Magazyn wsparcia (Rare) | +1 maksymalny zapas każdej usługi, maks. 4 użycia z 3 kartami |
 | Większa seria / szybsza linia | +1/2/3/4/5 jeździków na serię albo +10/20/30/40/50% bazowego tempa produkcji, zgodnie z rzadkością karty |
 
 Powtarzane bonusy parametrów sumują się względem wartości bazowej. Bonus obrażeń wieżyczek obejmuje również truciznę, podpalenie i eksplozje. Premia tempa skraca także ładowanie lancy. Moduły rdzenia są jednorazowymi odblokowaniami w obrębie ekspedycji; po zdobyciu znikają z puli. [Szczegóły etapu 2](ETAP_02.md).
@@ -62,7 +64,7 @@ Przekaźniki wzmacniają aktualne parametry bojowego sąsiada o 20%, także ład
 
 ### Heksy i zrzuty wieżyczek
 
-**Jednorazowe usługi:** Brimstone po 3 s zadaje sześć impulsów po 10 000 obrażeń (co 0,5 s) w promieniu 10 m; fala po 3 s ogłusza wszystkich obecnych przeciwników na 5 s; przeciążenie po 3 s poświęca wybraną wieżyczkę i zadaje 50 000 obrażeń w promieniu 40 m. Każda kosztuje 1 punkt. Wybór celu zatrzymuje czas, a PPM/Esc/Tab anuluje go bez straty punktu. Zniszczony heks można ponownie zabudować; wybrana technologia pozostaje w limicie 4+2. [Szczegółowe zasady](USLUGI.md).
+**Odnawialne wsparcie:** Brimstone zadaje łącznie 25 000 obrażeń i śledzi wskazanego bossa; paraliż zatrzymuje przeciwników na 5 s. Zamiast przeciążenia wieżyczki jest zrzut cyberświń na wolny heks: cztery drony opuszczają klatkę przez 6 s, po kolejnych 2 s klatka wybucha i wypuszcza dwie jednostki. Świnie biegną w przeciwnych kierunkach po pierścieniu w odległości wybranego heksu od rdzenia, strzelają laserami i zadają 1500 obrażeń kontaktowych. Po pięciu okrążeniach uciekają. Komputer jest zgaszony przed odblokowaniem; ładowanie i zapasy usług widać na ekranie. [Szczegółowe zasady](USLUGI.md).
 
 Wokół rdzenia jest **210 stanowisk na regularnej siatce heksagonalnej**, tworzącej duży sześciokąt z wolnym środkiem na platformę. Odstęp między stanowiskami wynosi **21 metrów**. Po wybraniu karty dowolnej wieżyczki automatycznie przechodzisz do widoku taktycznego. **LPM na wolnym heksie** zamawia dostawę. Podgląd pokazuje właściwy model i jego aktualny zasięg, wraz z bonusami. Miejsce zostaje zarezerwowane, a wieżyczka opada na linach pod balonem. Po około **6 sekundach** ląduje i zaczyna strzelać. Balon odczepia liny, uruchamia napęd i szybko wraca w górę.
 
@@ -107,7 +109,8 @@ Broń jest oddzielnym modułem od fotela i windy. Parametry z tabeli są wartoś
 - Platforma rdzenia na wysokości 18 m: centralny fotel, teleskopowa winda, konsole i kolumny. Okrągły dach ma kształt niskiego ściętego stożka z rozsuwanym okrągłym włazem. Opada ku brzegom, odsłaniając więcej terenu podczas celowania z podniesionego stanowiska. Barierki biegną po zewnętrznej krawędzi pokładu; można podejść do nich bliżej.
 - Można chodzić i rozglądać się po pokładzie. Kolizje chronią przed wejściem w stanowisko, kolumny i konsole oraz spadnięciem z krawędzi.
 - Po uruchomieniu wydobycia nie ma natychmiastowej grupy przy bazie. Przeciwnicy zaczynają nadchodzić pojedynczo z obrzeży, w odległości 280–320 m od rdzenia; pierwszy pojawia się po około 0,5 s, następni początkowo co około 2,8 s. Po 60 s dochodzą szybcy łowcy, po 120 s tarany, po 180 s plujące bestie, po 240 s latające widma. Każdy gatunek ma oddzielny sprite i inne parametry. Elity pojawiają się od 90 s, są większe, mają złote oznaczenie i czterokrotne HP.
-- Co 3 minuty nadchodzi boss: naprzemiennie Tytan Bazaltu oraz Królowa Roju. Alarm pojawia się 10 s wcześniej. Tytan emituje uderzenia blisko rdzenia, Królowa przywołuje łowców. Pokonanie bossa daje 15 s zmniejszonego naporu.
+- Pierwszy boss nadchodzi po 3 min. Kolejne odstępy: 150/120/90/60/30 s, potem stale 30 s. Rotacja: Tytan → Królowa → Nadumysł → Żmij → Śluzowiec → Pożeracz → Plujec alfa → Tunelarz. Alarm pojawia się 10 s wcześniej, a pokonanie bossa daje 15 s zmniejszonego naporu.
+- Bazowo co 3 min przeciwnicy losują trwałą mutację Common–Legendary: HP, liczebność, prędkość, obrażenia, szybszą ewolucję albo zdolność specjalną, np. unik Łowców i dodatkowego bossa w serii. Kapitan pojawia się w lewym dolnym rogu HUD-u na czas meldunku o mutacji: pokazuje jej efekt i kolor rzadkości, z animacją otwierania ust. Po meldunku połączenie znika. [Pełna tabela i zasady mutacji](MUTACJE_PRZECIWNIKOW.md).
 - Z bossa zawsze wypada kryształ; z elity jest 1% szansy. W widoku z góry kliknij kryształ, aby wysłać drona. **C** wysyła drona po najbliższy wolny kryształ. Można kolejkować kolejne zlecenia. Nagroda trafia do komputera dopiero po powrocie; kryształ bossa daje propozycje ulepszeń minimum Rare, z większą szansą Epic i Legendary; karta budowy zachowuje stałą rzadkość swojego typu. Uran nadal daje wypłatę natychmiast po zapełnieniu paska.
 - Standardowy napór ma limit 6000 aktywnych przeciwników; wspólna symulacja obsługuje do 20 000, uwzględniając przywołania. Limit jeździków wynosi 2048. Obrona i produkcja pochodzą z kart, bez sklepu.
 - Podstawowe bestie mają stale 100 HP, ale ich paski zdrowia pozostają ukryte. Brak zapisu stanu i rozwoju między podejściami.
@@ -176,6 +179,8 @@ Pierwszy etap: `native/expedition.hpp` — wydobycie, transporty i kolejka kart;
 
 Rdzeń regeneruje **3 HP/s**. Powtarzalne **Nanoboty regenerujące** zwiększają tę wartość zależnie od rzadkości. Dwa różne komputery z ekranami skierowanymi do środka oraz animowana pompa uranu z miernikami tworzą centrum dowodzenia. [Zasady regeneracji i pompy](RDZEN_I_POMPA.md).
 
+**Tarcza energetyczna (Epic)**: mały dron wnosi kompaktowy generator Jan Kowalski Company pod dach, nad balustradą, i ustawia go wewnątrz po prawej stronie obok radaru. Osłona ma 1000 HP, regeneruje 10 HP/s i po zniszczeniu odbudowuje się przez 60 s. Heksy pulsują do okapu i są widoczne także od środka, z delikatniejszą intensywnością. Skrzynka i HUD pokazują integralność oraz timer. Pojemność, regeneracja i odbudowa mają osobne ścieżki ulepszeń. [Mechanika i testy](TARCZA_ENERGETYCZNA.md), [logo i prompt](ASSETS-TARCZA.md).
+
 Legendarny moduł lancy **REZERWA URANOWA** przedłuża ostrzał po 3 sekundach kosztem 5 uranu/s; wiązka i dodatkowy przewód stają się zielone. [Aktualne zmiany dział manualnych](MANUALNE_ZMIANY.md).
 
 Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry przed rzutem, a przewód rezerwy lancy jest widoczny po lewej stronie z fotela. Zatrucie manualne dodaje 20 HP/s bestiom i 100 HP/s bossom; automatyczna toksyna ma osobne, kumulowane dawki. Bossowie mają paski HP. Lampy bazy są zielone powyżej 50%, żółte przy 20–50%, czerwone przy 20% lub mniej; poniżej 20% kamera operatora lekko drży.
@@ -184,7 +189,7 @@ Wszystkie dziewięć dział ma teraz własny legendarny moduł. Tesla odblokowuj
 
 Paczka ZIP zawiera również Uruchom-Linux.sh i LINUX.txt: uruchamianie buildu Windows przez Wine albo Steam Proton. To nie jest natywny port Linux; działanie na Linux nie zostało tutaj zweryfikowane.
 
-Czterech nowych bossów: Żmij segmentowy, Śluzowiec (łącznie 24000 HP), Pożeracz oraz Plujec alfa. Wszystkich przywołasz z bestiariusza pod apostrofem. Mechaniki i statystyki: [BOSSY.md](BOSSY.md).
+Nowi bossowie: Żmij segmentowy, Śluzowiec (łącznie 24000 HP), Pożeracz, Plujec alfa oraz długi, nurkujący Tunelarz. Wszystkich przywołasz z bestiariusza pod apostrofem. Mechaniki i statystyki: [BOSSY.md](BOSSY.md).
 
 ## Kawa i senność
 

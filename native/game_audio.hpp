@@ -15,12 +15,14 @@ class GameAudio {
   std::array<uint64_t, WeaponCount> last{};
   std::array<float, WeaponCount> lastTime{};
   uint64_t lastBrimstone = 0, lastOverload = 0;
+  uint64_t lastMutationAlert = 0;
   command::ManualSound manualSound;
 
 public:
   bool enabled = true;
   static float heavyWave(int type, float phase, float age, float random) {
     float bass = std::sin(phase * 2 * PI);
+    if (type == 102) return .6f*bass+.4f*std::sin(phase*4*PI);
     if (type == 100)
       return .55f * bass + .23f * std::sin(phase * 4 * PI) +
              .12f * std::sin(age * 2 * PI * (420 - age * 240)) + .1f * random;
@@ -51,6 +53,7 @@ public:
     voices.clear();
     manualSound.reset();
     lastBrimstone = lastOverload = 0;
+    lastMutationAlert = 0;
   }
   void build() {
     if (enabled && voices.size() < 32)
@@ -62,6 +65,8 @@ public:
     manual.active = manual.active && enabled && !g.paused;
     manualSound.set(manual);
     if (enabled && !g.paused) {
+      if (g.mutationAlerts > lastMutationAlert && voices.size() < 30)
+        voices.push_back({0,0,.22f,880,.035f,102});
       if (g.brimstonePulses > lastBrimstone && voices.size() < 30)
         voices.push_back({0, 0, .72f, 78, .24f, 100});
       if (g.overloadBlasts > lastOverload && voices.size() < 30)
@@ -69,6 +74,7 @@ public:
     }
     lastBrimstone = g.brimstonePulses;
     lastOverload = g.overloadBlasts;
+    lastMutationAlert = g.mutationAlerts;
     for (int i = 0; i < WeaponCount; ++i) {
       if (enabled && !g.paused && g.fired[i] > last[i] && g.time - lastTime[i] > .07f &&
           voices.size() < 32) {

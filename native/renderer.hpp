@@ -103,7 +103,7 @@ float3 beamSide(float3 dir,float3 toEye){
  return safeDirection(side,float3(1,0,0));
 }
 VSOut vsMain(VSIn i){VSOut o;float mode=params.x;float3 p=i.p*i.scale;
- if(mode==1||mode==8||mode==9||mode==17||mode==25){if(mode==25){float2 q=p.xy;p.xy=float2(q.x*cos(i.yaw)-q.y*sin(i.yaw),q.x*sin(i.yaw)+q.y*cos(i.yaw));}p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
+ if(mode==1||mode==8||mode==9||mode==17||mode==25||mode==26){if(mode==25){float2 q=p.xy;p.xy=float2(q.x*cos(i.yaw)-q.y*sin(i.yaw),q.x*sin(i.yaw)+q.y*cos(i.yaw));}p=i.origin+camRight.xyz*p.x+camUp.xyz*p.y;o.normal=normalize(eye.xyz-i.origin);}
  else if(mode==2){float3 dir=safeDirection(float3(i.yaw,0,i.extra),float3(0,0,1));float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+side*p.x+dir*p.y;o.normal=float3(0,1,0);}
  else if(mode==7){float3 dir=float3(i.scale.y,i.scale.z,i.yaw);float3 side=beamSide(dir,eye.xyz-i.origin);p=i.origin+dir*i.p.y+side*i.p.x*i.scale.x;o.normal=float3(0,1,0);}
  else if(mode==10||mode==12){p=i.origin+float3(i.p.x*i.scale.x,0,i.p.y*i.scale.y);o.normal=float3(0,1,0);}
@@ -120,6 +120,22 @@ VSOut vsMain(VSIn i){VSOut o;float mode=params.x;float3 p=i.p*i.scale;
 }
 float4 psMain(VSOut i):SV_TARGET{
  float mode=params.x;float4 c=i.color;
+ if(mode==27){
+  bool inside=length(eye.xz)<14.8;
+  float2 normal=normalize(i.world.xz);if(!inside)clip(dot(normal,eye.xz-i.world.xz));
+  float2 p=i.uv/1.3,grid=float2(1.7320508,3),offset=float2(.8660254,1.5);
+  float2 a=(frac(p/grid+.5)-.5)*grid,b=(frac((p-offset)/grid+.5)-.5)*grid;
+  float2 q=dot(a,a)<dot(b,b)?a:b;
+  float d=max(abs(q.x),dot(abs(q),float2(.5,.8660254)));
+  float cellEdge=1-smoothstep(.022,.06,abs(d-.8660254));
+  float pulse=.65+.35*sin(i.extra*3+i.uv.y*.8);
+  float sweep=exp(-pow((frac(i.uv.y/21-i.extra*.15)-.5)*13,2));
+  float3 tint=lerp(float3(.12,.72,1),float3(1,.32,.08),saturate((.25-c.r)*4));
+  float opacity=.012+cellEdge*(.18+.10*pulse)+sweep*.06+c.g*.3;
+  if(inside)opacity*=.42;
+  return float4(tint*(.6+cellEdge*.45+sweep),saturate(opacity));
+ }
+ if(mode==28){float4 t=tex.Sample(samp,i.uv);clip(t.a-.3);return float4(pow(max(t.rgb*c.rgb,0),1/2.2),t.a);}
  if(mode==22){float4 t=tex.Sample(samp,i.uv);clip(t.a-.2);return float4(pow(max(t.rgb*c.rgb,0),1/2.2),1);}
  if(mode==19||mode==20){
   float radius=c.r*3*params.w/900;
@@ -179,7 +195,7 @@ float4 psMain(VSOut i):SV_TARGET{
   float opacity=mode==23?1-pow(max(1-c.a*mask,0),join):c.a*mask*join;
   return float4(c.rgb,opacity*fog);
  }
- if(mode==1){float4 t=tex.Sample(samp,i.uv);clip(t.a-.32);c*=t;c.a=1;}
+ if(mode==1||mode==26){if(mode==26)clip(i.world.y-.12);float4 t=tex.Sample(samp,i.uv);clip(t.a-.32);c*=t;c.a=1;}
  else if(mode==2){float edge=1-abs(i.uv.x*2-1);c.rgb*=pow(saturate(edge),1.2)*2;c.a*=edge;return c;}
  else if(mode==3){float d=length(i.world.xz);clip(camRight.w-d);float3 detail=sqrt(max(tex.Sample(groundSamp,i.world.xz/10).rgb,0));float3 broad=sqrt(max(tex.Sample(groundSamp,i.world.xz/47).rgb,0));c.rgb*=.65+1.3*(detail*.8+broad*.2);}
  else c*=tex.Sample(samp,i.uv);
@@ -392,7 +408,8 @@ public:
     check(device->CreateShaderResourceView(t, nullptr, out.put()), "Texture view");
     context->GenerateMips(out);
   }
-  void loadTexture(const std::filesystem::path& path, Com<ID3D11ShaderResourceView>& out) {
+  void loadTexture(const std::filesystem::path& path, Com<ID3D11ShaderResourceView>& out,
+                   bool srgb = true) {
     Com<IWICBitmapDecoder> decoder;
     check(wic->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ,
                                          WICDecodeMetadataCacheOnLoad, decoder.put()),
@@ -408,7 +425,7 @@ public:
     convert->GetSize(&w, &h);
     std::vector<uint8_t> pixels(size_t(w) * h * 4);
     check(convert->CopyPixels(nullptr, w * 4, UINT(pixels.size()), pixels.data()), "PNG pixels");
-    texture(w, h, pixels.data(), out);
+    texture(w, h, pixels.data(), out, srgb);
   }
   void makeFont() {
     constexpr int w = 512, h = 384;
@@ -635,11 +652,11 @@ public:
     instanceOffset += UINT(count);
     bool overlay = mode == 4 || mode == 5 || mode == 11 || mode == 16 || mode == 19 || mode == 20 || mode == 21,
          soft = mode == 2 || mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
-                mode == 14 || mode == 15 || mode == 18 || mode == 23 || mode == 24 || mode == 25;
+                mode == 14 || mode == 15 || mode == 18 || mode == 23 || mode == 24 || mode == 25 || mode == 27;
     context->OMSetDepthStencilState(overlay ? depthOff : soft ? depthRead : depthWrite, 0);
     bool add = mode == 2 || mode == 7 || mode == 8 || mode == 24;
     bool blend =
-        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18 || mode == 21 || mode == 23 || mode == 25;
+        mode == 4 || mode == 5 || mode == 9 || mode == 10 || mode == 12 || mode == 14 || mode == 15 || mode == 16 || mode == 18 || mode == 21 || mode == 23 || mode == 25 || mode == 27;
     context->OMSetBlendState(add ? additive : blend ? alpha : opaque, nullptr, 0xffffffff);
     context->DrawInstanced(mesh.count, UINT(count), 0, 0);
     ++drawCalls;

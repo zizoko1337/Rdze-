@@ -86,7 +86,8 @@ inline void buildSlotOverlay(GameScene& scene, const Session& s, int hovered) {
       if (d.slot == i && !d.installed)
         color = {1, .6f, .18f};
     if (i == hovered)
-      color = available && s.sentryStock > 0 ? Color{.6f, 1, .8f} : Color{1, .3f, .25f};
+      color = available && (s.sentryStock > 0 || s.serviceTarget == Service::CyberPigs)
+                  ? Color{.6f, 1, .8f} : Color{1, .3f, .25f};
     for (int side = 0; side < 6; ++side) {
       float a = PI / 6 + side * PI / 3, b = a + PI / 3;
       scene.rod({p.x + std::cos(a) * SLOT_RADIUS, .12f, p.z + std::sin(a) * SLOT_RADIUS},

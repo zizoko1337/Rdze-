@@ -18,12 +18,29 @@ struct RayHit {
   int id = -1;
   float distance;
   Vec3 point;
+  int part = -2;
 };
 struct Input {
   float side = 0, forward = 0;
   bool fast = false, fire = false;
 };
 
+inline RayHit traceTunneler(const Game& g, const TunnelerBody& body, Vec3 origin,
+                           Vec3 direction, float range, float thickness = 0) {
+  RayHit result{-1, range, origin + direction * range};
+  if (!g.valid(body.head, body.generation)) return result;
+  for (int part = -1; part < body.SEGMENTS; ++part) {
+    if (!g.partExposed(body.head, part)) continue;
+    Vec3 delta = origin - g.partPoint(body.head, part);
+    float r = g.partSize(body.head, part) * .43f + thickness;
+    float b = dot(delta, direction), d = b * b - dot(delta, delta) + r * r;
+    if (d < 0 || -b + std::sqrt(d) < 0) continue;
+    float t = std::max(0.f, -b - std::sqrt(d));
+    if (t < result.distance && (origin + direction * t).y >= .1f)
+      result = {body.head, t, origin + direction * t, part};
+  }
+  return result;
+}
 inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range, float thickness = 0) {
   direction = normalize(direction);
   RayHit result{-1, range, origin + direction * range};
@@ -34,6 +51,7 @@ inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range, flo
   float radius = std::hypot(direction.x, direction.z) * result.distance * .5f + 16 + thickness;
   g.grid.radius(middle.x, middle.z, radius, g.foes, [&](int i) {
     const auto& foe = g.foes[i];
+    if (foe.type == Tunneler) return; // Its exposed head and segments are queried together below.
     Vec3 delta = origin - g.targetPoint(i);
     float r = foe.size * .43f + thickness;
     float b = dot(delta, direction), c = dot(delta, delta) - r * r;
@@ -48,6 +66,10 @@ inline RayHit trace(const Game& g, Vec3 origin, Vec3 direction, float range, flo
       result.distance = t;
     }
   });
+  for (const auto& body : g.tunnelers) {
+    auto hit = traceTunneler(g, body, origin, direction, result.distance, thickness);
+    if (hit.id >= 0) result = hit;
+  }
   // Segments share the head's health and ID; no extra AI entities or grid cells.
   for (const auto& body : g.worms) {
     if (!g.valid(body.head, body.generation))
@@ -220,7 +242,7 @@ public:
     return length(d) < 3.3f && dot(normalize(d), forward()) > .35f;
   }
   bool nearTerminal() const { return nearConsole(-1); }
-  bool nearServices() const { return nearConsole(1); }
+  bool nearServices() const { return expedition.support.unlocked && nearConsole(1); }
   bool nearStartButton() const {
     Vec3 delta = START_BUTTON - player;
     return expedition.enabled && !expedition.miningStarted && mode == Mode::Walking && !tactical &&
@@ -306,6 +328,14 @@ public:
       expedition.miningMultiplier += .25f * power;
     if (kind == Upgrade::Nanobots)
       expedition.regeneration += power;
+    if (kind == Upgrade::EnergyShield)
+      expedition.shield.order();
+    if (kind == Upgrade::ShieldCapacity)
+      expedition.shield.maxHp += 250 * power;
+    if (kind == Upgrade::ShieldRegeneration)
+      expedition.shield.regeneration += 2 * power;
+    if (kind == Upgrade::ShieldRebuild)
+      expedition.shield.fasterRebuild(5 * power);
     if (kind == Upgrade::Hull) {
       expedition.maxHp += 250 * power;
       expedition.hp = std::min(expedition.maxHp, expedition.hp + 250 * power);
@@ -339,7 +369,11 @@ public:
     if (kind == Upgrade::RoverRate)
       expedition.roverRate = std::min(24.f, expedition.roverRate + (int(rarity) + 1) * .1f);
     if (kind == Upgrade::ServiceCredit)
-      ++expedition.servicePoints;
+      expedition.support.unlock();
+    if (kind == Upgrade::ServiceRecharge)
+      ++expedition.support.rechargeLevel;
+    if (kind == Upgrade::ServiceStorage)
+      ++expedition.support.storageLevel;
     if (coffeeUpgradeTier(kind))
       expedition.coffeeTier = coffeeUpgradeTier(kind);
     if (machineUpgradeTier(kind))
@@ -403,7 +437,7 @@ public:
   }
   bool chooseService(int choice) {
     if (!servicesOpen || !expedition.miningStarted || expedition.dead() ||
-        expedition.servicePoints <= 0 || choice < 0 || choice >= int(Service::Count))
+        choice < 0 || choice >= int(Service::Count) || !expedition.support.ready(Service(choice)))
       return false;
     auto kind = Service(choice);
     if (kind == Service::StunWave) {
@@ -420,23 +454,28 @@ public:
   bool targetService(Vec3 point, int slot = -1) {
     if (serviceTarget == Service::None || expedition.dead() || servicesOpen || terminalOpen)
       return false;
-    uint32_t id = 0;
-    if (serviceTarget == Service::Overload) {
-      if (slot < 0 || slot >= SLOT_COUNT)
-        return false;
+    if (serviceTarget == Service::CyberPigs) {
+      if (!slotAvailable(slot)) return false;
       const auto& p = TURRET_SLOTS[slot];
-      for (const auto& tower : world.towers)
-        if (std::hypot(tower.x - p.x, tower.z - p.z) < .5f) {
-          id = tower.id;
-          point = {tower.x, 0, tower.z};
-          break;
-        }
-      if (!id)
-        return false;
+      point = {p.x,0,p.z};
     }
-    if (!services.order(expedition, serviceTarget, point, id))
+    if (!services.order(expedition, serviceTarget, point, slot))
       return false;
-    world.announce(std::string(SERVICES[int(serviceTarget)].name) + ": aktywacja za 3 s.");
+    if (serviceTarget == Service::Brimstone) {
+      float best = 1e30f;
+      world.targetsNear(point.x,point.z,30,[&](int id) {
+        const auto& foe=world.foes[id];
+        auto aim = world.targetPoint(id,point);
+        float distance=std::hypot(aim.x-point.x,aim.z-point.z);
+        if (foe.type >= Titan && distance <= 10+foe.size*.25f && distance < best) {
+          best=distance;
+          services.casts.back().bossTarget=id;
+          services.casts.back().bossGeneration=foe.generation;
+        }
+      });
+    }
+    world.announce(std::string(SERVICES[int(serviceTarget)].name) +
+                   (serviceTarget == Service::CyberPigs ? ": 4 drony opuszczają klatkę." : ": aktywacja za 3 s."));
     serviceTarget = Service::None;
     return true;
   }
@@ -457,6 +496,7 @@ public:
   bool slotAvailable(int slot) const {
     if (slot < 0 || slot >= SLOT_COUNT)
       return false;
+    if (services.reserved(slot)) return false;
     const auto& p = TURRET_SLOTS[slot];
     if (world.canBuild(p.x, p.z))
       return false;
@@ -711,6 +751,14 @@ public:
       }
     }
     // The eight canopy columns are solid, as are the command consoles.
+    if (expedition.shield.installed) {
+      const auto& p = EnergyShield::DOCK;
+      float dx = player.x - p.x, dz = player.z - p.z, distance = std::hypot(dx,dz);
+      if (distance < 1.15f) {
+        if (distance < .001f) {dx=1;dz=0;distance=1;}
+        player.x=p.x+dx/distance*1.15f;player.z=p.z+dz/distance*1.15f;
+      }
+    }
     for (int i = 0; i < 8; ++i) {
       float a = i * PI / 4, x = std::sin(a) * 11.8f, z = std::cos(a) * 11.8f;
       float dx = player.x - x, dz = player.z - z, distance = std::hypot(dx, dz);
@@ -786,7 +834,7 @@ public:
       return;
     if (module.kind == Gun::Smart) {
       updateSmartTarget();
-      if (!world.valid(smartTarget, smartGeneration))
+      if (!world.valid(smartTarget, smartGeneration) || !world.targetable(smartTarget))
         return;
     }
     if ((module.kind == Gun::Howitzer || module.kind == Gun::Toxin || module.kind == Gun::Smart) &&
@@ -810,9 +858,11 @@ public:
         world.groundMarks.spot(hit.point, .32f, 3.5f, .35f);
       if (hit.id >= 0) {
         markTarget(hit.id);
-        world.hurt(hit.id, s.damage * module.damageMultiplier + flatDamage, Laser);
-        ++impacts;
-        hitFlash = .16f;
+        if (world.hurt(hit.id, s.damage * module.damageMultiplier + flatDamage, Laser, true,
+                       DamageClass::Direct, hit.part) > 0) {
+          ++impacts;
+          hitFlash = .16f;
+        }
       }
     } else if (module.kind == Gun::Arc) {
       fireArc();
@@ -895,8 +945,10 @@ public:
     float targetSpeed = input.fire && mode == Mode::Mounted ? 28.f : 0;
     spinSpeed += (targetSpeed - spinSpeed) * std::min(1.f, dt * 8);
     spin += spinSpeed * dt;
-    if (expedition.enabled && !expedition.miningStarted)
+    if (expedition.enabled && !expedition.miningStarted) {
+      expedition.shield.step(dt);
       return;
+    }
     float damageBefore = world.coreDamage;
     services.step(world, expedition, dt);
     stepToxicPatches(dt);
@@ -905,15 +957,16 @@ public:
       expedition.releaseTower(type);
     world.destroyedTowers.clear();
     size_t rewardsBefore = expedition.rewards.size();
-    float damagedHp = std::max(0.f, expedition.hp - std::max(0.f, world.coreDamage - damageBefore));
+    float hullBefore = expedition.hp;
     expedition.step(dt, world.coreDamage - damageBefore);
+    float damagedHp = std::max(0.f, hullBefore - expedition.lastHullDamage);
     if (expedition.levels[size_t(Upgrade::Purge)] > 0 && !expedition.purgeUsed &&
         damagedHp <= expedition.maxHp * .5f) {
       expedition.purgeUsed = true;
       for (int id : world.active) {
         auto& foe = world.foes[id];
         if (foe.hp > 0)
-          world.hurt(id, foe.type >= Titan ? foe.maxHp * .5f : foe.hp, Tesla);
+          world.hurt(id, foe.type >= Titan ? foe.maxHp * .5f : foe.hp, Tesla, true, DamageClass::Service);
       }
       world.ring({0, .8f, 0}, {1, .8f, .35f}, 400, 2.5f);
       world.announce("AWARYJNE OCZYSZCZENIE. Jednorazowy ładunek zużyty.");
@@ -969,9 +1022,10 @@ public:
         world.groundMarks.spot(b.pos, .16f, 2.5f);
       if (hit.id >= 0) {
         markTarget(hit.id);
-        world.hurt(hit.id, b.damage, Minigun);
-        ++impacts;
-        hitFlash = .12f;
+        if (world.hurt(hit.id, b.damage, Minigun, true, DamageClass::Direct, hit.part) > 0) {
+          ++impacts;
+          hitFlash = .12f;
+        }
         world.sparks(hit.point, module.spec().color, 3, 3);
       }
       if (hit.id >= 0 || b.life <= 0 || b.pos.y <= .01f) {

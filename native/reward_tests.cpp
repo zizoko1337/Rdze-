@@ -15,6 +15,48 @@ bool hasCombat(const RewardOffer& offer) {
 }
 int main() {
   try {
+    {
+      int fifthOfferFallbacks = 0, earlyUnlocks = 0;
+      for (uint32_t seed = 1; seed <= 2000; ++seed) {
+        Expedition e(true, true);
+        e.rewardRandom.state = seed*7919;
+        e.luck = int(seed%4)*50;
+        int firstAppearance = 0;
+        for (int deal = 1; deal <= 5; ++deal) {
+          auto source = seed%2 ? RewardSource::Uranium : RewardSource((deal-1)%3);
+          e.addReward(source);
+          const auto& offer = e.rewards.back();
+          int copies = 0;
+          for (int card = 0; card < 3; ++card)
+            if (offer.choices[card] == Upgrade::ServiceCredit) {
+              ++copies;
+              require(offer.rarities[card] == Rarity::Rare,"Guaranteed unlock changed rarity");
+            }
+          require(copies <= 1,"Duplicate support unlock in one deal");
+          if (copies && !firstAppearance) firstAppearance = deal;
+          if (deal == 1 && source == RewardSource::Uranium)
+            require(hasCombat(offer),"Service guarantee removes first combat tower");
+          e.validateFront();
+        }
+        require(firstAppearance > 0 && firstAppearance <= 5,
+                "No support unlock among first five natural deals");
+        require(!e.support.unlocked && e.levels[size_t(Upgrade::ServiceCredit)] == 0 &&
+                    e.support.total() == 0,"Guaranteed offer automatically installs upgrade");
+        if (firstAppearance == 5) ++fifthOfferFallbacks;
+        else ++earlyUnlocks;
+      }
+      require(fifthOfferFallbacks > 0 && earlyUnlocks > 0,"Early and fifth-offer paths not covered");
+      Expedition unlocked(true,true);
+      unlocked.support.unlock();
+      unlocked.levels[size_t(Upgrade::ServiceCredit)] = 1;
+      for (int deal = 0; deal < 10; ++deal) {
+        unlocked.addReward();
+        const auto& choices = unlocked.rewards.back().choices;
+        require(std::find(choices.begin(),choices.end(),Upgrade::ServiceCredit) == choices.end(),
+                "Guarantee offers an acquired unlock");
+      }
+      std::cout << "PASS support unlock offered within first five deals, Rare, optional choice, mixed sources and no acquired duplicates\n";
+    }
     for (auto u : {Upgrade::TowerDamage, Upgrade::TowerRate, Upgrade::TowerRange}) {
       auto s = std::make_unique<Session>(true, true);
       for (int n = 0; n < 5; ++n)

@@ -12,6 +12,8 @@
 #include "coffee_scene.hpp"
 #include "coffee_effects.hpp"
 #include "coffee_visual_test.hpp"
+#include "captain_comms.hpp"
+#include "energy_shield_scene.hpp"
 #include "factory_visual_test.hpp"
 #include <chrono>
 #include <fstream>
@@ -116,10 +118,12 @@ inline int run(int argc, char** argv) {
     GameScene scene(renderer, assets);
     CommandRoof roof(renderer);
     SentryDropScene dropScene(renderer);
+    ServiceScene serviceScene(renderer, assets);
     FrontierScene frontierScene(renderer, assets);
     SniperMonitor sniperMonitor;
     JukeboxScene jukebox;
     CoffeeScene coffeeScene(renderer, assets);
+    EnergyShieldScene shieldScene(renderer, assets);
     CoffeeEffects coffeeEffects;
     CoffeeVisualTest coffeeVisual;
     UpgradeLab upgradeLab;
@@ -131,6 +135,7 @@ inline int run(int argc, char** argv) {
     bool corePauseMenuPass = false;
     float coreFrozenHp = 0, coreStartHp = 0, coreStartTime = 0;
     CommandUi ui;
+    CaptainComms captain(renderer,assets);
     ui.resize(width, height);
     GameAudio audio;
     MusicPlayer music(root / "public" / "music", test);
@@ -221,17 +226,26 @@ inline int run(int argc, char** argv) {
         session->frontier.lootRandom.state =
             (uint32_t(Clock::now().time_since_epoch().count()) ^ 0x9E3779B9u) | 1u;
       session->start(session->module.kind);
+      if (!test) {
+        session->frontier.mutations.random.state =
+            uint32_t(Clock::now().time_since_epoch().count()) | 1u;
+        session->world.mutationRandom.state = (session->frontier.mutations.random.state ^ 0x7382ae13u)|1u;
+      }
       // Legacy integration tests begin after the new physical start-button interaction.
       if (test && liveExpedition && !servicesTest && !radioTest)
         session->startExtraction();
       if (servicesLab) {
         session->expedition.hp = session->expedition.maxHp = 20000;
-        session->expedition.servicePoints = 6;
+        session->expedition.support.unlock();
+        session->expedition.support.storageLevel = 3;
+        session->expedition.support.charges.fill(4);
+        session->expedition.levels[size_t(Upgrade::ServiceCredit)] = 1;
+        session->expedition.levels[size_t(Upgrade::ServiceStorage)] = 3;
         for (int i = 0; i < 3; ++i)
           session->expedition.rewards.push_back(
               {uint64_t(i + 1),
-               {Upgrade::ServiceCredit, Upgrade::Mining, Upgrade::Hull},
-               {Rarity::Rare, Rarity::Rare, Rarity::Rare}});
+               {Upgrade::ServiceRecharge, Upgrade::Mining, Upgrade::Hull},
+               {Rarity::Uncommon, Rarity::Rare, Rarity::Rare}});
         session->expedition.rewardSerial = 3;
       }
       if (progressionLab) {
@@ -485,7 +499,7 @@ inline int run(int argc, char** argv) {
           session->expedition.uranium = 52;
           for (int i = 0; i < 3; ++i)
             session->expedition.addReward();
-          session->expedition.servicePoints = 2;
+          session->expedition.support.unlock();
           coreStartTime = session->world.time;
           capture = "core-01-command-center.png";
           stageAt = wall;
@@ -1039,7 +1053,7 @@ inline int run(int argc, char** argv) {
         } else if (stage == 8 && wall - stageAt > .2) {
           click(ui.rewardCard(0));
           stage = 9;
-        } else if (stage == 9 && session->expedition.servicePoints == 1 && !session->terminalOpen) {
+        } else if (stage == 9 && session->expedition.support.unlocked && !session->terminalOpen) {
           serviceChecks[1] = session->expedition.rewards.empty();
           session->player.x = 6.8f;
           key(SDL_SCANCODE_E);
@@ -1057,7 +1071,7 @@ inline int run(int argc, char** argv) {
         } else if (stage == 11 && session->serviceTarget == Service::Brimstone &&
                    wall - stageAt > .35) {
           serviceChecks[2] =
-              session->world.time == frozen && session->expedition.servicePoints == 1;
+              session->world.time == frozen && session->expedition.support.charges[0] == 1;
           serviceBoss = session->world.spawn(Titan, 42, 36);
           serviceOutside = session->world.spawn(Crawler, 53, 36);
           for (int id : {serviceBoss, serviceOutside}) {
@@ -1069,7 +1083,7 @@ inline int run(int argc, char** argv) {
           stage = 12;
         } else if (stage == 12 && !session->services.casts.empty() &&
                    session->services.casts.front().age > 2.5f) {
-          serviceChecks[2] &= session->expedition.servicePoints == 0 &&
+          serviceChecks[2] &= session->expedition.support.charges[0] == 0 &&
                               session->world.foes[serviceBoss].hp == 100000;
           capture = "services-07-brimstone-warning.png";
           stage = 13;
@@ -1089,9 +1103,9 @@ inline int run(int argc, char** argv) {
           key(SDL_SCANCODE_P);
           stage = 15;
         } else if (stage == 15 && session->services.casts.empty()) {
-          serviceChecks[3] &= std::abs(session->world.foes[serviceBoss].hp - 40000) < 1 &&
+          serviceChecks[3] &= std::abs(session->world.foes[serviceBoss].hp - 75000) < 1 &&
                               session->world.foes[serviceOutside].hp == 100000;
-          session->expedition.servicePoints = 1;
+          session->expedition.support.charges[1] = 1;
           key(SDL_SCANCODE_TAB);
           key(SDL_SCANCODE_E);
           stage = 16;
@@ -1105,11 +1119,11 @@ inline int run(int argc, char** argv) {
                              session->world.foes[serviceOutside].stun > 4.7f;
           capture = "services-09-stun.png";
           serviceSlot = nearestTurretSlot(42, 36);
-          auto p = TURRET_SLOTS[serviceSlot];
-          session->world.addTower(Laser, p.x, p.z);
+          auto neighbor = TURRET_SLOTS[(serviceSlot+1)%SLOT_COUNT];
+          session->world.addTower(Laser, neighbor.x, neighbor.z);
           session->world.towers.back().cooldown = 1000;
           session->expedition.levels[size_t(Upgrade::Sentry)] = 1;
-          session->expedition.servicePoints = 1;
+          session->expedition.support.charges[2] = 1;
           stage = 101;
           stageAt = wall;
         } else if (stage == 101 && wall - stageAt > .2) {
@@ -1120,20 +1134,21 @@ inline int run(int argc, char** argv) {
           key(SDL_SCANCODE_3);
           stage = 19;
           stageAt = wall;
-        } else if (stage == 19 && session->serviceTarget == Service::Overload &&
+        } else if (stage == 19 && session->serviceTarget == Service::CyberPigs &&
                    wall - stageAt > .2) {
           auto p = TURRET_SLOTS[serviceSlot];
           clickWorld({p.x, 0, p.z});
           stage = 20;
-        } else if (stage == 20 && session->serviceTarget == Service::None) {
-          capture = "services-10-overload.png";
+        } else if (stage == 20 && session->serviceTarget == Service::None &&
+                   !session->services.casts.empty() && session->services.casts.back().age > 4) {
+          capture = "services-10-cage-delivery.png";
           stage = 21;
-        } else if (stage == 21 && session->world.towers.empty()) {
+        } else if (stage == 21 && session->services.cyberPigs.pigs.size() == 2) {
           serviceChecks[5] = session->slotAvailable(serviceSlot) &&
                              session->expedition.chosenTypes(false) == 1 &&
                              session->expedition.eligible(Upgrade::Sentry) &&
-                             session->expedition.servicePoints == 0;
-          capture = "services-11-cleared-hex.png";
+                             session->expedition.support.charges[2] == 0 && session->world.towers.size() == 1;
+          capture = "services-11-cyber-pigs.png";
           stage = 22;
           stageAt = wall;
         } else if (stage == 22 && wall - stageAt > .2) {
@@ -1141,11 +1156,11 @@ inline int run(int argc, char** argv) {
           stage = 23;
         } else if (stage == 23 && session->mode == Mode::Selection) {
           serviceChecks[0] &=
-              !session->expedition.miningStarted && session->expedition.servicePoints == 0;
+              !session->expedition.miningStarted && !session->expedition.support.unlocked;
           stage = 24;
           running = false;
         }
-        if (wall > 50)
+        if (wall > 70)
           running = false;
       }
       if (frontierTest) {
@@ -1163,7 +1178,7 @@ inline int run(int argc, char** argv) {
           session->expedition.rewards.push_back(
               {1,
                {Upgrade::RoverFactory, Upgrade::Hull, Upgrade::Mining},
-               {Rarity::Rare, Rarity::Rare, Rarity::Rare}});
+               {Rarity::Uncommon, Rarity::Rare, Rarity::Rare}});
           key(SDL_SCANCODE_A);
           stage = 2;
         } else if (stage == 2 && session->player.x <= -6.7f) {
@@ -1563,7 +1578,7 @@ inline int run(int argc, char** argv) {
             else if (code == SDL_SCANCODE_RIGHT)
               bestiary.selected = (bestiary.selected + 1) % SpeciesCount;
             else if (code == SDL_SCANCODE_UP || code == SDL_SCANCODE_DOWN)
-              bestiary.selected = (bestiary.selected + 7) % SpeciesCount;
+              bestiary.selected = Bestiary::otherRow(bestiary.selected);
             else if (code == SDL_SCANCODE_RETURN || code == SDL_SCANCODE_KP_ENTER)
               bestiary.summon(*session, Species(bestiary.selected));
             continue;
@@ -1896,7 +1911,7 @@ inline int run(int argc, char** argv) {
         camera.target = {0, CORE_HEIGHT + 2, 4};
       }
       if (capture == "services-08-brimstone.png" || capture == "services-09-stun.png" ||
-          capture == "services-10-overload.png" || capture == "services-11-cleared-hex.png") {
+          capture == "services-10-cage-delivery.png" || capture == "services-11-cyber-pigs.png") {
         camera.eye = {66, 34, 1};
         camera.target = {42, 4, 36};
       }
@@ -1954,8 +1969,9 @@ inline int run(int argc, char** argv) {
       frontierScene.append(scene, *session, hoveredCrystal);
       jukebox.append(scene, *session, radioStatus, float(dt));
       coffeeScene.append(scene, *session);
-      appendServiceEffects(scene, *session, {tacticalView.placeX, 0, tacticalView.placeZ},
-                           hoveredSlot);
+      shieldScene.append(scene, *session);
+      serviceScene.append(scene, *session, {tacticalView.placeX, 0, tacticalView.placeZ},
+                           hoveredSlot, camera.right);
       scene.render(renderer);
       sniperMonitor.draw(renderer, *session);
       jukebox.draw(renderer);
@@ -1975,6 +1991,7 @@ inline int run(int argc, char** argv) {
       else
         ui.drawCommand(renderer, *session, fps, SDL_GetWindowRelativeMouseMode(window.get()), help,
                        audio.enabled, hoveredSlot, hoveredCrystal);
+      captain.draw(renderer,ui,*session,help);
       if (sleepyView)
         coffeeEffects.eyelids(renderer, session->coffee.blink());
       renderer.end();
@@ -2110,11 +2127,11 @@ inline int run(int argc, char** argv) {
       std::ofstream out(artifacts / "services-result.json");
       out << "{\n  \"passed\": " << (pass ? "true" : "false") << ",\n  \"stage\": " << stage;
       const char* names[] = {"manual_start_and_reset",
-                             "rare_credit_and_console_roles",
+                             "rare_unlock_and_console_roles",
                              "target_selection_and_delay",
                              "brimstone_damage_and_pause",
                              "global_stun",
-                             "overload_and_reusable_slot"};
+                             "cyber_pig_delivery_and_free_slot"};
       for (size_t i = 0; i < serviceChecks.size(); ++i)
         out << ",\n  \"" << names[i] << "\": " << (serviceChecks[i] ? "true" : "false");
       out << "\n}\n";

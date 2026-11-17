@@ -25,7 +25,8 @@ int enemy(Session& s, Species type, float x, float z) {
 void menu(Session& s, int points) {
   s.terminalOpen = false;
   s.servicesOpen = true;
-  s.expedition.servicePoints = points;
+  s.expedition.support.unlock();
+  s.expedition.support.charges.fill(points);
 }
 int main() {
   try {
@@ -62,11 +63,14 @@ int main() {
               "Left console is not upgrades-only");
       s.interact();
       s.player.x = 6.8f;
+      require(!s.nearServices() && !s.interact(), "Unpowered service terminal opens");
+      require(s.debugGrant(Upgrade::ServiceCredit, Rarity::Rare), "Cannot unlock service terminal");
       require(s.nearServices() && !s.nearTerminal() && s.interact() && s.servicesOpen &&
                   !s.terminalOpen,
               "Right console is not services-only");
       require(!s.chooseUpgrade(0), "Services console consumes upgrade reward");
-      std::cout << "PASS manual start, idle preparation, gradual frontier arrivals, animated-button clock "
+      std::cout << "PASS manual start, idle preparation, gradual frontier arrivals, "
+                   "animated-button clock "
                    "and separate consoles\n";
     }
     {
@@ -89,21 +93,22 @@ int main() {
                                       {Upgrade::ServiceCredit, Upgrade::Hull, Upgrade::Mining},
                                       {Rarity::Rare, Rarity::Common, Rarity::Common}});
       s.terminalOpen = true;
-      require(s.chooseUpgrade(0) && s.expedition.servicePoints == 1 && s.expedition.rewards.empty(),
-              "Credit card does not grant one point");
+      require(s.chooseUpgrade(0) && s.expedition.support.total() == 3 &&
+                  s.expedition.rewards.empty(),
+              "Unlock does not ready each service independently");
       menu(s, 1);
       require(s.chooseService(0), "Brimstone selection failed");
       float time = s.world.time;
       tick(s, 3);
-      require(s.world.time == time && s.expedition.servicePoints == 1,
+      require(s.world.time == time && s.expedition.support.charges[0] == 1,
               "Targeting advances time or spends point early");
       require(!s.targetService({std::numeric_limits<float>::quiet_NaN(), 0, 0}),
               "Invalid target accepted");
       s.cancelService();
-      require(s.servicesOpen && s.expedition.servicePoints == 1, "Cancel loses credit");
+      require(s.servicesOpen && s.expedition.support.charges[0] == 1, "Cancel loses charge");
       menu(s, 0);
       require(!s.chooseService(1), "Free service accepted");
-      std::cout << "PASS Rare-only credit, one-point reward, free targeting cancellation and "
+      std::cout << "PASS Rare-only terminal unlock, independent stocks, free targeting cancellation and "
                    "invalid inputs\n";
     }
     {
@@ -115,24 +120,38 @@ int main() {
         s.world.foes[id].hp = s.world.foes[id].maxHp = 100000;
       menu(s, 1);
       require(s.chooseService(0) && s.targetService({42, 0, 36}), "Cannot order targeted beam");
-      require(s.expedition.servicePoints == 0, "Brimstone did not charge one point");
+      require(s.expedition.support.charges[0] == 0 && s.expedition.support.charges[1] == 1,
+              "Brimstone consumes the wrong service inventory");
       tick(s, 2.9f);
       require(s.world.foes[center].hp == 100000, "Beam damages before 3-second warning");
       tick(s, .3f);
       float hp = s.world.foes[center].hp, age = s.services.casts.front().age;
-      require(hp == 90000 && s.world.brimstonePulses == 1, "Beam first 10000-damage pulse missing");
+      require(std::abs(hp-(100000-ServiceSystem::brimstonePulse(0))) < .02f &&
+                  s.world.brimstonePulses == 1, "First Brimstone pulse incorrect");
       s.world.paused = true;
       tick(s, 2);
       require(s.world.foes[center].hp == hp && s.services.casts.front().age == age,
               "Pause advances beam / damage");
       s.world.paused = false;
       tick(s, 3.1f);
-      require(std::abs(s.world.foes[center].hp - 40000) < 1 && s.world.brimstonePulses == 6 &&
-                  std::abs(s.world.foes[near].hp - 40000) < 1 &&
+      require(std::abs(s.world.foes[center].hp - 75000) < 1 && s.world.brimstonePulses == 6 &&
+                  std::abs(s.world.foes[near].hp - 75000) < 1 &&
                   s.world.foes[outside].hp == 100000 && s.services.casts.empty(),
-              "Beam does not deal six 10000-damage pulses in 10m");
+              "Brimstone does not deal 25000 total damage in 10m");
       std::cout
-          << "PASS Brimstone delay, six 10000-damage pulses, 10m radius, pause and completion\n";
+          << "PASS Brimstone delay, 25000 total damage, 10m radius, pause and completion\n";
+    }
+    {
+      Session s(true,true);quiet(s);
+      int boss=enemy(s,Titan,100,0);
+      s.world.foes[boss].hp=s.world.foes[boss].maxHp=100000;
+      s.world.foes[boss].speed=8;
+      menu(s,1);
+      require(s.chooseService(0) && s.targetService({100,0,0}),"Cannot lock Brimstone onto boss");
+      tick(s,6.1f);
+      require(std::abs(s.world.foes[boss].hp-75000)<1,"Moving boss escapes tracked Brimstone");
+      require(s.world.foes[boss].x<60,"Tracking fixture does not move far enough");
+      std::cout << "PASS Brimstone follows a moving boss for the entire 25000-damage volley\n";
     }
     {
       Session s(true, true);
@@ -160,76 +179,6 @@ int main() {
               "Actors do not resume after 5-second stun");
       std::cout << "PASS global delayed stun, boss inclusion, disabled attacks/abilities, active "
                    "DOT and expiry\n";
-    }
-    {
-      Session s(true, true);
-      quiet(s);
-      int slot = nearestTurretSlot(0, 36);
-      const auto& p = TURRET_SLOTS[slot];
-      int supportSlot = nearestTurretSlot(p.x + SUPPORT_SPACING, p.z);
-      const auto& q = TURRET_SLOTS[supportSlot];
-      s.world.addTower(Laser, p.x, p.z);
-      s.world.towers.back().cooldown = 1000;
-      s.world.addTower(RateRelay, q.x, q.z);
-      s.expedition.levels[size_t(Upgrade::Sentry)] = 1;
-      s.expedition.levels[size_t(Upgrade::RateRelayTower)] = 1;
-      require(s.world.towers.front().localRate == 1.2f, "Support fixture failed");
-      int victim = enemy(s, Titan, q.x, q.z), outside = enemy(s, Crawler, q.x + 40.5f, q.z);
-      s.world.foes[victim].hp = s.world.foes[victim].maxHp = 100000;
-      menu(s, 2);
-      require(s.chooseService(2), "Cannot select overload");
-      require(!s.targetService({0, 0, 0}, 0) && s.expedition.servicePoints == 2,
-              "Empty target consumes point");
-      require(s.targetService({q.x, 0, q.z}, supportSlot) && s.expedition.servicePoints == 1,
-              "Cannot target installed support");
-      s.servicesOpen = true;
-      require(s.chooseService(2), "Cannot select second overload");
-      require(!s.targetService({q.x, 0, q.z}, supportSlot) && s.expedition.servicePoints == 1,
-              "Duplicate overload reservation accepted");
-      s.cancelService();
-      s.servicesOpen = false;
-      tick(s, 3.1f);
-      require(s.world.towers.size() == 1 && s.world.towers.front().localRate == 1 &&
-                  s.slotAvailable(supportSlot),
-              "Overload does not remove support and rebuild neighbours");
-      require(s.world.foes[victim].hp == 50000 && s.world.foes[outside].hp == 10000 &&
-                  s.world.overloadBlasts == 1,
-              "Overload 50000 damage / 40m radius wrong");
-      require(s.expedition.chosenTypes(true) == 1 && s.expedition.eligible(Upgrade::RateRelayTower),
-              "Destroyed type forgotten or cannot be reacquired");
-      s.servicesOpen = true;
-      require(s.chooseService(2) && s.targetService({p.x, 0, p.z}, slot),
-              "Cannot sacrifice final combat tower");
-      tick(s, 3.1f);
-      require(s.world.towers.empty() && s.expedition.acquiredTowers() == 0 &&
-                  s.expedition.chosenTypes(false) == 1 && s.expedition.eligible(Upgrade::Sentry),
-              "Final sacrifice does not free slot / retain combat technology");
-      std::cout
-          << "PASS overload target validity, reservation, 50000 damage / 40m, support removal "
-             "and retained technology\n";
-    }
-    {
-      Session s(true, true);
-      quiet(s);
-      s.expedition.servicePoints = 2;
-      for (int index : {0, 1}) {
-        auto p = TURRET_SLOTS[index];
-        s.world.addTower(Laser, p.x, p.z);
-        s.services.order(s.expedition, Service::Overload, {p.x, 0, p.z}, s.world.towers.back().id);
-      }
-      tick(s, 3.1f);
-      require(s.world.towers.empty(), "Concurrent overload uses stale vector index");
-      auto p = TURRET_SLOTS[0];
-      s.world.addTower(Laser, p.x, p.z);
-      s.expedition.servicePoints = 1;
-      s.services.order(s.expedition, Service::Overload, {p.x, 0, p.z}, s.world.towers.back().id);
-      s.world.removeTower(p.x, p.z);
-      s.world.addTower(Laser, p.x, p.z);
-      tick(s, 3.1f);
-      require(s.world.towers.size() == 1 && s.expedition.servicePoints == 1,
-              "Invalidated overload destroys replacement or loses point");
-      std::cout
-          << "PASS stable tower IDs, simultaneous sacrifices and refund for invalidated target\n";
     }
     std::cout << "ALL SERVICES TESTS PASSED\n";
     return 0;
