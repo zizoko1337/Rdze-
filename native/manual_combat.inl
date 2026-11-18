@@ -341,13 +341,47 @@ void firePlasmaMortar() {
     manualProjectiles.push_back(p);
   }
 }
+void fireShotgun() {
+  Vec3 direction=forward(),right=normalize(cross({0,1,0},direction)),up=cross(direction,right);
+  float rotation=random.unit()*2*PI;
+  for(int n=0;n<PlasmaShotgun::PELLETS;++n) {
+    float angle=rotation+n*2.399963f, radius=module.spread()*std::sqrt((n+.5f)/10);
+    Vec3 end=eye()+normalize(direction+right*(std::cos(angle)*radius)+up*(std::sin(angle)*radius))*module.spec().range;
+    Vec3 start=shotgunMuzzle(shotgun.lastBarrel);
+    ManualProjectile p{Gun::Shotgun,start,start,start,end,{}};
+    p.velocity=normalize(end-start)*module.spec().speed;
+    p.damage=manualDamage();p.emitter=shotgun.lastBarrel;p.duration=module.spec().range/module.spec().speed;
+    manualProjectiles.push_back(p);
+  }
+  // Apply the real aiming kick only after all ten trajectories have been fixed.
+  pitch=gunPitch=std::clamp(pitch+PlasmaShotgun::KICK,-1.12f,.65f);
+  pendingPitch=0;
+}
 void stepManualProjectiles(float dt) {
   for (size_t i = 0; i < manualProjectiles.size();) {
     auto& p = manualProjectiles[i];
     p.age += dt;
     p.previous = p.pos;
     bool impact = false;
-    if (p.kind == Gun::Smart) {
+    if (p.kind == Gun::Shotgun) {
+      Vec3 displacement=p.velocity*dt;
+      auto hit=trace(world,p.previous,displacement,length(displacement),.28f);
+      Vec3 end=hit.point;
+      float wall=coreHitFraction(p.previous,end);
+      if(wall<1) {end=p.previous+(end-p.previous)*wall;hit.id=-1;impact=true;}
+      p.pos=end;
+      if(hit.id>=0) {
+        manualHit(hit.id,p.damage,Laser,true,DamageClass::Direct,hit.part);
+        impact=true;
+      }
+      impact|=p.age>=p.duration||p.pos.y<=.01f;
+      if(impact) {
+        world.sparks(p.pos,module.spec().color,9,9);
+        world.ring(p.pos,module.spec().color,.8f,.25f);
+        if(p.pos.y<=.05f)world.groundMarks.spot(p.pos,.45f,4,.8f);
+        manualProjectiles[i]=manualProjectiles.back();manualProjectiles.pop_back();continue;
+      }
+    } else if (p.kind == Gun::Smart) {
       if (world.valid(p.target, p.generation) && world.targetable(p.target))
         p.endpoint = world.targetPoint(p.target, p.pos);
       Vec3 delta = p.endpoint - p.pos;

@@ -49,7 +49,9 @@ public:
     // Peak roll in degrees, backward movement and upward movement. All remain subtle.
     constexpr Vec3 kick[] = {{.22f, .012f, .004f}, {.025f, .002f, .0007f}, {.32f, .018f, .006f},
                              {.36f, .022f, .007f}, {.48f, .032f, .010f},   {.085f, .006f, .002f},
-                             {.18f, .012f, .004f}, {.42f, .027f, .008f},   {.012f, .001f, .0003f}};
+                             {.18f, .012f, .004f}, {.42f, .027f, .008f},   {.012f, .001f, .0003f},
+                             {9.f,.24f,.06f}};
+    static_assert(std::size(kick)==GUN_COUNT);
     Vec3 p = kick[int(gun)];
     if (plasma)
       p = {.38f, .025f, .008f};
@@ -58,9 +60,10 @@ public:
     if (gun == Gun::Rail)
       pitchVelocity += .28f * PI / 180 * impulse;
     velocity = velocity + Vec3{p.x * PI / 180 * side, p.y, p.z} * impulse;
-    velocity.x = std::clamp(velocity.x, -.5f, .5f);
-    velocity.y = std::min(velocity.y, 2.f);
-    velocity.z = std::min(velocity.z, .7f);
+    float strength=gun==Gun::Shotgun?16.f:1.f;
+    velocity.x = std::clamp(velocity.x, -.5f*strength, .5f*strength);
+    velocity.y = std::min(velocity.y, 2.f*strength);
+    velocity.z = std::min(velocity.z, .7f*strength);
   }
   void step(float dt, Gun gun, bool mounted, bool held, bool beam, bool reserve) {
     aimDelta = {};
@@ -106,12 +109,13 @@ public:
     }
     float roughness = vibration * (1 + .35f * reserveMix);
     float a = clock * 2 * PI;
-    pose.roll = std::clamp(spring.x, -.012f, .012f) +
+    float shotStrength=gun==Gun::Shotgun?16.f:1.f;
+    pose.roll = std::clamp(spring.x, -.012f*shotStrength, .012f*shotStrength) +
                 (.00038f * std::sin(a * 13.7f) + .00022f * std::sin(a * 19.1f)) * roughness;
     pose.pitch = std::clamp(pitchSpring, 0.f, .008f);
     pose.offset = {(.0025f * std::sin(a * 17.3f) + .0015f * std::sin(a * 23.7f)) * roughness,
-                   std::clamp(spring.z, 0.f, .025f) + .003f * std::sin(a * 21.1f) * roughness,
-                   -std::clamp(spring.y, 0.f, .075f) + .002f * std::sin(a * 15.7f) * roughness};
+                   std::clamp(spring.z, 0.f, .025f*shotStrength) + .003f * std::sin(a * 21.1f) * roughness,
+                   -std::clamp(spring.y, 0.f, .075f*shotStrength) + .002f * std::sin(a * 15.7f) * roughness};
   }
 };
 } // namespace command

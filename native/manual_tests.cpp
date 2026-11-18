@@ -237,7 +237,7 @@ int main() {
                 "Upgraded manual module does not actually damage enemy");
       }
       std::cout
-          << "PASS all nine replaceable modules, held firing and shared damage/rate upgrades\n";
+          << "PASS all ten replaceable modules, firing and shared damage/rate upgrades\n";
     }
     {
       Session s;

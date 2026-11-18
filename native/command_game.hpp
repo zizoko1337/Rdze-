@@ -146,6 +146,7 @@ public:
   uint64_t shots = 0, impacts = 0;
   std::vector<Bullet> bullets;
   std::vector<ManualProjectile> manualProjectiles;
+  PlasmaShotgun shotgun;
   std::vector<ToxicPatch> toxicPatches;
   int smartTarget = -1;
   uint32_t smartGeneration = 0;
@@ -573,6 +574,7 @@ public:
             -p.x * std::sin(gunYaw) + p.z * std::cos(gunYaw)};
   }
   Vec3 muzzle() const {
+    if (module.kind == Gun::Shotgun) return shotgunMuzzle(0);
     if (module.kind == Gun::Pulse && module.plasma)
       return plasmaMuzzle(7);
     if (module.kind == Gun::Toxin)
@@ -590,6 +592,7 @@ public:
     return gunPoint(
         {float(emitter % 5 - 2) * .32f, .45f, .9f + float(emitter / 5) * .42f - recoil * .23f});
   }
+  Vec3 shotgunMuzzle(int side) const { return gunPoint({side==0?-.5f:.5f,0,4.8f-recoil*.25f}); }
   bool nearSeat() const {
     Vec3 d = Vec3{0, player.y, 0} - player;
     return mode == Mode::Walking && !tactical && length(d) <= 4.6f &&
@@ -826,6 +829,7 @@ public:
     if (mode != Mode::Mounted || cooldown > .00001f || blocked() || tactical || coffee.active ||
         module.kind == Gun::Lance)
       return;
+    if (module.kind == Gun::Shotgun && (shotgun.reloading || shotgun.triggerLatched || shotgun.rounds<=0 || manualProjectiles.size()+10>128)) return;
     if (module.kind == Gun::Pulse && module.plasma && manualProjectiles.size() + 20 > 1024)
       return;
     if (module.kind == Gun::Toxin && toxinCycle().lift < .999f)
@@ -840,14 +844,19 @@ public:
     if ((module.kind == Gun::Howitzer || module.kind == Gun::Toxin || module.kind == Gun::Smart) &&
         manualProjectiles.size() >= 64)
       return;
-    cooldown = std::max(-.05f, cooldown) + module.interval() / std::max(.1f, module.rateMultiplier);
+    if (module.kind == Gun::Shotgun) {
+      shotgun.discharge(module.rateMultiplier);
+      cooldown=shotgun.reloading?shotgun.duration:.65f;
+    } else cooldown = std::max(-.05f, cooldown) + module.interval() / std::max(.1f, module.rateMultiplier);
     recoil = 1;
     shotFlash = .09f;
     ++shots;
     feedback.shot(module.kind, module.kind == Gun::Pulse && module.plasma);
     ++world.fired[s.audio];
     Vec3 direction = forward();
-    if (module.kind == Gun::Pulse && module.plasma) {
+    if (module.kind == Gun::Shotgun) {
+      fireShotgun();
+    } else if (module.kind == Gun::Pulse && module.plasma) {
       firePlasmaMortar();
     } else if (module.kind == Gun::Pulse) {
       RayHit hit = trace(world, eye(), direction, s.range);
@@ -937,6 +946,11 @@ public:
       }
     }
     cooldown -= dt;
+    if (module.kind == Gun::Shotgun) {
+      bool reloading=shotgun.reloading;shotgun.step(dt);
+      if(reloading)cooldown=shotgun.remaining();
+      if(!input.fire)shotgun.triggerLatched=false;
+    }
     if (!input.fire || mode != Mode::Mounted)
       cooldown = std::max(0.f, cooldown);
     recoil = std::max(0.f, recoil - dt * 5);

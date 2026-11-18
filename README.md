@@ -18,7 +18,7 @@ Jeśli używasz tego samego konta GitHub, na drugim komputerze wystarczy klonowa
 
 `ZROB_EXE.bat` przebudowuje aktualną grę, uruchamia testy i odtwarza samodzielny EXE oraz ZIP. Sam skrypt `native/package.ps1` pakuje istniejący plik z `native/build`; po zmianach kodu użyj wariantu z przebudową. Wcześniejsze pliki BAT nadal działają.
 
-Kliknij **Rdzen.exe** lub **START.bat**. Wybierz jeden z dziewięciu modułów manualnych (myszą albo 1–9), następnie naciśnij **Enter** lub przycisk rozpoczęcia ekspedycji. Broń platformy wydobywającej uran z obcej planety w roku 2137.
+Kliknij **Rdzen.exe** lub **START.bat**. Wybierz jeden z dziesięciu modułów manualnych (myszą albo 1–9/0), następnie naciśnij **Enter** lub przycisk rozpoczęcia ekspedycji. Broń platformy wydobywającej uran z obcej planety w roku 2137.
 
 Zaczynasz na pokładzie rdzenia, pod dachem centrum dowodzenia. **Najpierw obejdź działo i podejdź do czerwonego przycisku za nim. E uruchamia wydobycie i napór przeciwników.** Przycisk wciska się i zjeżdża pod pokład. Zapadnia pozostaje otwarta, a z jej wnętrza wyjeżdża **cyber-jukebox URANIUM FM 2137**. Przed uruchomieniem możesz spokojnie chodzić po platformie; czas ekspedycji i wydobycie stoją.
 
@@ -78,7 +78,9 @@ Przeciwnicy uszkadzają rdzeń po dojściu do niego. Przy **0 HP** ekspedycja si
 
 Obsługa działa ma lekką bezwładność kamery: krótki, płynny dojazd do kierunku wskazanego myszą, bez kołysania. Wygładzanie działa niezależnie od liczby klatek; celownik, lufa i strzały korzystają z tego samego kierunku. Rozglądanie podczas chodzenia pozostaje bezpośrednie.
 
-## Dziewięć modułów manualnych
+## Dziesięć modułów manualnych
+
+**Plazmowa dubeltówka (0)** oddaje dwa osobne strzały po 10 pocisków × 3000 obrażeń. Po drugim następuje 12-sekundowe łamanie luf i jednoczesna wymiana obu baterii przez moduł wysuwany znad fotela. Przed złamaniem lufy unoszą się na podnośniku; finałem jest górna dźwignia z zębatkami i tłokiem. Każdy strzał ma potężny huk, przechył i odrzut celowania o 10° w górę. [Model, mechanika i testy](PLAZMOWA_DUBELTOWKA.md).
 
 Zwykły minigun ma stopniowo czerwieniejące końcówki luf. Jego przemiana **Legendary: Extreme Cooling System** dodaje kriogeniczne dysze z mgiełką przy gorących lufach, **bazową szybkostrzelność x5 (60/s)** i **rozrzut x2**. Wcześniejsze premie nadal działają. Testowo dodaj ją przez ; i wyszukaj „cooling”. [Opis chłodzenia](EXTREME_COOLING.md).
 
@@ -99,8 +101,9 @@ Laser i minigun są podstawowymi działami startowymi; pozostałe odblokowania d
 | Lanca próżniowa | 1650 DPS + 200 przy pierwszym kontakcie, 550 m | Przytrzymaj LPM: ładowanie 1,8 s, wiązka przez 3 s, chłodzenie 2 s. Puszczenie przerywa ładowanie lub ostrzał. |
 | Snajper / Railgun | 750 bazowych obrażeń × (1 + dystans w m / 100), co 2,4 s, 750 m | Przebija do ośmiu przeciwników; każdy otrzymuje własny bonus dystansu. Ekran na broni pokazuje rzeczywisty widok z celownika w zbliżeniu około 8,3×. |
 | Miotacz / Piekło | 240 DPS; PPM: 63 m szeroko / 94,5 m wąsko (5 m) | Stożek o kącie około 57°, zasięg trzech odstępów heksów; podpalenie 30 DPS przez 3 s. Podświetlenie ziemi pokazuje obszar działania, jego krawędzie i odstępy co 21 m. |
+| Plazmowa dubeltówka | Dwa osobne strzały po 10 × 3000 obrażeń, 360 m | Osobne kliknięcia LPM, odstęp 0,65 s; po drugim strzale 12 s przeładowania i wymiana obu baterii naraz przez automat znad fotela. Huk, duży przechył i odrzut 10° w górę. |
 
-Wszystkie dziewięć modułów jest obecnie dostępnych od początku. Laser trafia pierwszego przeciwnika na linii celowania; minigun może chybić. Wyjątkiem od ręcznego celowania są rakiety Smart oraz kolejne skoki Tesli. Kolorowy błysk celownika sygnalizuje trafienie. Amunicja jest nieograniczona. Modele, animacje i celowniki modułów są różne; fotel i winda pozostają wspólne. [Pełny opis i testy](DZIALA_MANUALNE.md).
+Wszystkie dziesięć modułów jest obecnie dostępnych od początku. Laser trafia pierwszego przeciwnika na linii celowania; minigun może chybić. Wyjątkiem od ręcznego celowania są rakiety Smart oraz kolejne skoki Tesli. Kolorowy błysk celownika sygnalizuje trafienie. Amunicja jest nieograniczona. Modele, animacje i celowniki modułów są różne; fotel i winda pozostają wspólne. [Pełny opis i testy](DZIALA_MANUALNE.md).
 
 Broń jest oddzielnym modułem od fotela i windy. Parametry z tabeli są wartościami początkowymi; karty zdobyte w danym podejściu modyfikują obrażenia i szybkostrzelność.
 
@@ -123,7 +126,7 @@ Jeździki używają przezroczystego sprite’a widzianego od tyłu. Wybierają n
 
 | Klawisz | Działanie |
 | --- | --- |
-| 1–9, Enter | Wybór broni i start w menu |
+| 1–9/0, Enter | Wybór broni i start w menu |
 | 1 / 2 / 3 w terminalu | Wybór jednej karty |
 | WASD / Shift | Chodzenie / szybszy ruch po platformie |
 | Mysz | Rozglądanie i ręczne celowanie |
@@ -185,7 +188,7 @@ Legendarny moduł lancy **REZERWA URANOWA** przedłuża ostrzał po 3 sekundach 
 
 Radar na platformie jest na godzinie 2. Nalewak katapulty składa się do góry przed rzutem, a przewód rezerwy lancy jest widoczny po lewej stronie z fotela. Zatrucie manualne dodaje 20 HP/s bestiom i 100 HP/s bossom; automatyczna toksyna ma osobne, kumulowane dawki. Bossowie mają paski HP. Lampy bazy są zielone powyżej 50%, żółte przy 20–50%, czerwone przy 20% lub mniej; poniżej 20% kamera operatora lekko drży.
 
-Wszystkie dziewięć dział ma teraz własny legendarny moduł. Tesla odblokowuje PPM ze wzmacnianiem wieżyczek, katapulta klej unieruchamiający, moździerz dwa odbicia, Smart Instant namierzanie, snajper +2% obrażeń za metr i drugi ekran CRT, miotacz dwa jednoczesne strumienie. [Pełne zasady i nazwy kart](LEGENDY_MANUALNE.md).
+Dotychczasowe dziewięć dział ma własny legendarny moduł. Tesla odblokowuje PPM ze wzmacnianiem wieżyczek, katapulta klej unieruchamiający, moździerz dwa odbicia, Smart Instant namierzanie, snajper +2% obrażeń za metr i drugi ekran CRT, miotacz dwa jednoczesne strumienie. [Pełne zasady i nazwy kart](LEGENDY_MANUALNE.md).
 
 Paczka ZIP zawiera również Uruchom-Linux.sh i LINUX.txt: uruchamianie buildu Windows przez Wine albo Steam Proton. To nie jest natywny port Linux; działanie na Linux nie zostało tutaj zweryfikowane.
 

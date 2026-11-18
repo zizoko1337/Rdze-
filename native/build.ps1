@@ -30,6 +30,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Command tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Manual arsenal test compilation failed.' }
 & (Join-Path $out 'manual-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Manual arsenal tests failed.' }
+& $compiler @common (Join-Path $PSScriptRoot 'plasma_shotgun_tests.cpp') '-o' (Join-Path $out 'plasma-shotgun-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Plasma shotgun test compilation failed.' }
+& (Join-Path $out 'plasma-shotgun-tests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Plasma shotgun tests failed.' }
 & $compiler @common (Join-Path $PSScriptRoot 'ground_effect_tests.cpp') '-o' (Join-Path $out 'ground-effect-tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Ground effect test compilation failed.' }
 & (Join-Path $out 'ground-effect-tests.exe')
@@ -134,6 +138,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Radio tests failed.' }
 if (!$TestsOnly) {
   $programs = @(@{ Source='game_main.cpp'; Output='rdzen-game.exe' }, @{ Source='render_tests.cpp'; Output='render-tests.exe' }, @{ Source='tunneler_visual_tests.cpp'; Output='tunneler-visual-tests.exe' })
   $programs += @{ Source='energy_shield_visual_tests.cpp'; Output='energy-shield-visual-tests.exe' }
+  $programs += @{ Source='plasma_shotgun_visual_tests.cpp'; Output='plasma-shotgun-visual-tests.exe' }
   if (!$GameOnly) { $programs += @{ Source='main.cpp'; Output='rdzen-native.exe' } }
   foreach ($program in $programs) {
     & $compiler @common '-I' (Join-Path $sdl 'include') (Join-Path $PSScriptRoot $program.Source) '-L' (Join-Path $sdl 'lib') '-lSDL3.dll' '-ld3d11' '-ldxgi' '-ld3dcompiler' '-lole32' '-lwindowscodecs' '-luuid' '-lpsapi' '-lgdi32' '-lmfplat' '-lmfreadwrite' '-lmfuuid' '-o' (Join-Path $out $program.Output)

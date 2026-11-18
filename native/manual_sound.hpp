@@ -58,9 +58,10 @@ public:
     out +=
         crank * (.014f * std::sin(a * 47) + .009f * filteredNoise) * (.8f + .2f * std::sin(a * 12));
     out += flame * .012f * filteredNoise;
-    constexpr float freq[] = {165, 95, 82, 58, 43, 72, 94, 53, 68};
-    constexpr float length[] = {.18f, .045f, .28f, .32f, .4f, .13f, 0, .32f, .07f};
-    constexpr float gain[] = {.025f, .014f, .032f, .035f, .045f, .019f, 0, .045f, .006f};
+    constexpr float freq[] = {165, 95, 82, 58, 43, 72, 94, 53, 68,36};
+    constexpr float length[] = {.18f, .045f, .28f, .32f, .4f, .13f, 0, .32f, .07f,.9f};
+    constexpr float gain[] = {.025f, .014f, .032f, .035f, .045f, .019f, 0, .045f, .006f,.42f};
+    static_assert(std::size(gain)==GUN_COUNT);
     for (int n = 0; n < GUN_COUNT; ++n) {
       float age = shotAge[n];
       if (age >= length[n])
@@ -69,9 +70,12 @@ public:
       float body =
           std::sin(age * 2 * PI * freq[n]) * .7f + std::sin(age * 2 * PI * freq[n] * 2.13f) * .18f;
       out += gain[n] * envelope * (body + w * .12f * std::exp(-age * 45));
+      if(n==int(Gun::Shotgun))
+        out += envelope*(w*.22f*std::exp(-age*15)+.08f*std::sin(age*2*PI*(340-age*230)));
       shotAge[n] += dt;
     }
-    return std::clamp(out, -.16f, .16f);
+    float ceiling=controls.gun==Gun::Shotgun?.48f:.16f;
+    return std::clamp(out, -ceiling, ceiling);
   }
 };
 } // namespace command

@@ -1,9 +1,10 @@
 #pragma once
 #include "gameplay.hpp"
+#include "plasma_shotgun.hpp"
 
 namespace command {
 using namespace arsenal;
-enum class Gun { Pulse, Crank, Arc, Toxin, Howitzer, Smart, Lance, Rail, Flame, Count };
+enum class Gun { Pulse, Crank, Arc, Toxin, Howitzer, Smart, Lance, Rail, Flame, Shotgun, Count };
 inline constexpr int GUN_COUNT = int(Gun::Count);
 struct PlasmaSpec {
   static constexpr float spreadRadius = 10, hitRadius = 1, minSpeed = 60, maxSpeed = 85;
@@ -98,7 +99,9 @@ inline constexpr GunSpec GUNS[] = {
      0,
      {1, .35f, .08f},
      arsenal::Flame,
-     "PPM: szeroki 63 m / skupiony 94,5 m, szerokość 5 m. 240 DPS."}};
+     "PPM: szeroki 63 m / skupiony 94,5 m, szerokość 5 m. 240 DPS."},
+    {"PLAZMOWA DUBELTÓWKA",PlasmaShotgun::DAMAGE,12,360,.028f,220,{.35f,.8f,1},Laser,
+     "2 strzały po 10 x 3000 DMG. Automat wymienia parę baterii w 12 s. Odrzut +10 stopni."}};
 static_assert(std::size(GUNS) == GUN_COUNT);
 struct GunModule {
   Gun kind = Gun::Pulse;

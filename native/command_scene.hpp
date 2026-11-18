@@ -129,11 +129,13 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
     b.z -= s.recoil * .16f;
     scene.rod(s.gunPoint(a), s.gunPoint(b), radius, c, glow);
   };
+  if(s.module.kind!=Gun::Shotgun) {
   gunBox({0, 0, .4f}, {1.1f, .65f, 1.4f}, steel);
   gunBox({0, -.4f, .3f}, {.65f, .25f, 1.2f}, dark);
   for (float side : {-1.f, 1.f}) {
     barrel({side * .5f, -.1f, -.55f}, {side * .5f, .3f, -.55f}, .07f, dark);
     gunBox({side * .57f, .1f, .25f}, {.04f, .13f, .8f}, accent, true);
+  }
   }
   if (s.module.kind == Gun::Pulse && !s.module.plasma) {
     barrel({0, 0, 1}, {0, 0, 3.1f}, .19f, dark);
@@ -181,7 +183,7 @@ inline void buildCommandDeck(GameScene& scene, const Session& s) {
     }
   } else
     buildExtraManualGun(scene, s);
-  if (s.shotFlash > 0) {
+  if (s.shotFlash > 0 && s.module.kind!=Gun::Shotgun) {
     if (s.module.kind == Gun::Pulse && s.module.plasma) {
       for (int i = 0; i < 20; ++i)
         if (PlasmaSpec::visibleEmitter(i))
@@ -356,7 +358,7 @@ public:
     text(r, 65, height - 65, "1 / 2 / 3 lub kliknięcie — wybierz   |   E / Esc — wróć do obrony",
          15, muted);
   }
-  Rect choice(int i) const { return {60 + (i % 3) * 345.f, 250 + (i / 3) * 145.f, 330, 130}; }
+  Rect choice(int i) const { return {60 + (i % 4) * 258.f, 250 + (i / 4) * 145.f, 244, 130}; }
   Rect launch() const { return {60, 735, 1020, 58}; }
   int selectionClick(float px, float py) const {
     float x = px / scale, y = py / scale;
@@ -382,9 +384,9 @@ public:
         panel(r, b);
         if (int(s.module.kind) == i)
           rect(r, {b.x, b.y, 4, b.h}, GUNS[i].color);
-        text(r, b.x + 16, b.y + 16, "[" + std::to_string(i + 1) + "] " + GUNS[i].name, 17,
+        text(r, b.x + 12, b.y + 16, "[" + std::to_string(i==9?0:i+1) + "] " + GUNS[i].name, 14,
              GUNS[i].color);
-        paragraph(r, b.x + 16, b.y + 47, GUNS[i].detail, 39, 13, muted);
+        paragraph(r, b.x + 12, b.y + 44, GUNS[i].detail, 29, 12, muted);
         text(r, b.x + 16, b.y + 106, "ZASIĘG " + number(GUNS[i].range) + " m", 11, GUNS[i].color);
       }
       text(r, 72, 705,
@@ -395,7 +397,7 @@ public:
       text(r, 100, 750,
            s.expedition.enabled ? "[ENTER]  ROZPOCZNIJ EKSPEDYCJĘ" : "[ENTER]  ROZPOCZNIJ PRÓBĘ",
            21, {.02f, .06f, .08f});
-      text(r, 72, height - 58, "1-9 wybór   |   Enter start   |   Esc wyjście", 13, muted);
+      text(r, 72, height - 58, "1-9 / 0 wybór   |   Enter start   |   Esc wyjście", 13, muted);
       r.flushText();
       return;
     }
@@ -647,6 +649,8 @@ public:
           : s.lanceReserveActive     ? "REZERWA URANOWA / 5 U/s"
           : s.lanceRemaining > 0     ? "CIĄGŁA WIĄZKA / " + number(s.lanceRemaining, 1) + " s"
           : s.lanceCharge > 0        ? "ŁADOWANIE KONDENSATORÓW"
+          : s.module.kind==Gun::Shotgun ? std::string(s.shotgun.stage()) +
+                (s.shotgun.reloading?" / "+number(s.shotgun.remaining(),1)+" s":"")
           : s.cooldown > .05f        ? "ŁADOWANIE  " + number(s.cooldown, 1) + " s"
           : s.module.kind == Gun::Smart &&
                   s.world.valid(s.smartCandidate, s.smartCandidateGeneration) &&
@@ -659,6 +663,7 @@ public:
       float progress = s.mode == Mode::Mounted
                            ? 1 - std::clamp(s.cooldown / s.module.interval(), 0.f, 1.f)
                            : s.lift;
+      if(s.module.kind==Gun::Shotgun)progress=s.shotgun.progress();
       if (s.mode == Mode::Mounted && s.module.kind == Gun::Lance) {
         if (s.lanceReserveActive)
           progress = 1;

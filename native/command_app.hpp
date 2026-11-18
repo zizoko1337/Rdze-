@@ -14,6 +14,7 @@
 #include "coffee_visual_test.hpp"
 #include "captain_comms.hpp"
 #include "energy_shield_scene.hpp"
+#include "plasma_shotgun_scene.hpp"
 #include "factory_visual_test.hpp"
 #include <chrono>
 #include <fstream>
@@ -124,6 +125,7 @@ inline int run(int argc, char** argv) {
     JukeboxScene jukebox;
     CoffeeScene coffeeScene(renderer, assets);
     EnergyShieldScene shieldScene(renderer, assets);
+    PlasmaShotgunScene shotgunScene(renderer, assets);
     CoffeeEffects coffeeEffects;
     CoffeeVisualTest coffeeVisual;
     UpgradeLab upgradeLab;
@@ -1636,6 +1638,7 @@ inline int run(int argc, char** argv) {
           if (session->mode == Mode::Selection) {
             if (code >= SDL_SCANCODE_1 && code <= SDL_SCANCODE_9)
               session->module.kind = Gun(int(code - SDL_SCANCODE_1));
+            if(code==SDL_SCANCODE_0)session->module.kind=Gun::Shotgun;
             if (code == SDL_SCANCODE_RETURN || code == SDL_SCANCODE_KP_ENTER)
               launch();
             if (code == SDL_SCANCODE_ESCAPE)
@@ -1963,6 +1966,7 @@ inline int run(int argc, char** argv) {
       scene.prepare(session->world, passive, true);
       sniperMonitor.update(renderer, scene, *session, float(dt));
       buildCommandDeck(scene, *session);
+      shotgunScene.append(scene,*session);
       roof.append(scene, *session);
       dropScene.append(scene, *session);
       buildSlotOverlay(scene, *session, hoveredSlot);

@@ -1,5 +1,7 @@
 # Grafiki projektu
 
+Drewno i stal plazmowej dubeltówki: [tekstury i pełne prompty](ASSETS-DUBELTOWKA.md).
+
 Jeździk ma nowy sprite od tyłu: [public/assets/rover-rear.png](public/assets/rover-rear.png). Pochodzenie, narzędzie i pełny prompt: [ASSETS-JEZDZIK.md](ASSETS-JEZDZIK.md).
 
 Nowy natywny poligon ma sześć dodatkowych grafik przeciwników, w tym dwóch bossów. Pliki i pełne prompty: [native/ASSETS-ARSENAL.md](native/ASSETS-ARSENAL.md). Opis poniżej dokumentuje grafiki pierwotnego prototypu; natywna wersja również korzysta z `alien-beast.png` i `turret-metal.png`, a teren, efekty i modele tworzy w Direct3D 11.

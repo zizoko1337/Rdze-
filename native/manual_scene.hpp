@@ -303,13 +303,13 @@ inline void appendManualEffects(GameScene& scene, const Session& s) {
     Color c = GUNS[int(p.kind)].color;
     if (p.glue)
       c = {.16f, .4f, .055f};
-    float size = p.kind == Gun::Smart ? .65f : .95f;
+    float size = p.kind == Gun::Smart ? .65f : p.kind==Gun::Shotgun?.7f:.95f;
     scene.hot.push_back(instance(p.pos, {size, size, 1}, c));
-    Vec3 tail = p.kind == Gun::Smart ? p.pos - normalize(p.velocity) * 4
+    Vec3 tail = p.kind == Gun::Smart || p.kind==Gun::Shotgun ? p.pos - normalize(p.velocity) * 4
                 : p.plasma           ? p.pos - normalize(p.pos - p.previous) * 4
                                      : p.previous;
     scene.beams.push_back(lineInstance(tail, p.pos, c, p.plasma ? .22f : .15f));
-    if (p.plasma)
+    if (p.plasma || p.kind==Gun::Shotgun)
       scene.beams.push_back(lineInstance(tail, p.pos, {1, 1, 1}, .055f));
   }
   for (const auto& p : s.toxicPatches) {
@@ -371,6 +371,10 @@ inline void drawManualSight(GameUi& ui, Renderer& r, const Session& s) {
     }
   };
   switch (s.module.kind) {
+  case Gun::Shotgun:
+    corners(x,y,24,24,9);
+    ui.text(r,x+38,y-6,"10 x " + number(s.manualDamage()) + " / PLAZMA",12,c);
+    break;
   case Gun::Pulse:
     if (s.module.plasma) {
       corners(x, y, 35, 24, 13);

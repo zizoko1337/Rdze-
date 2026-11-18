@@ -1,8 +1,10 @@
 # Arsenał manualny
 
+Dziesiąty moduł: **plazmowa dubeltówka**, klawisz **0** w menu. Dwa osobne naciśnięcia LPM, każde po 10 pocisków × 3000 obrażeń; następnie 12 s przeładowania z jednoczesną wymianą obu baterii przez moduł znad fotela i górną dźwignią. Rzeczywisty odrzut o 10° w górę, mocny przechył i huk. [Pełny opis](PLAZMOWA_DUBELTOWKA.md). Test graficzny obejmuje również dziesiąty moduł. Dotychczasowe dziewięć zachowuje własne legendarne przemiany.
+
 Laser ma legendarną przemianę: [Laserowy moździerz](PLAZMA_LAB.md). Laboratorium ulepszeń do testowania jest pod klawiszem ;. Jego impulsy korzystają z powiększonego wspólnego poola 1024 pocisków; pozostałe moduły zachowują limit 64 pocisków specjalnych.
 
-W menu startowym wybierz moduł myszą lub klawiszami 1–9. Wszystkie są dostępne; nie ma jeszcze stałych odblokowań. Czerwony przycisk uruchamia wydobycie, E zajmuje fotel. Wspólna winda wynosi dowolny moduł nad dach. Przytrzymanie LPM podtrzymuje ostrzał. Parametry bazowe są w tabeli w README.
+W menu startowym wybierz moduł myszą lub klawiszami 1–9/0. Wszystkie są dostępne; nie ma jeszcze stałych odblokowań. Czerwony przycisk uruchamia wydobycie, E zajmuje fotel. Wspólna winda wynosi dowolny moduł nad dach. Przytrzymanie LPM podtrzymuje ostrzał. Parametry bazowe są w tabeli w README.
 
 1. Laser: pojedyncza celna wiązka, segmentowane chłodzenie i wskaźnik gotowości.
 2. Minigun: sześć obracających się luf, boczna korbka, rozrzut, łuski i rozchodzący się celownik.
@@ -18,6 +20,6 @@ Premie obrażeń i szybkostrzelności działa manualnego działają na każdy mo
 
 Symulacja ma osobne, zarezerwowane bufory: do 64 pocisków specjalnych i 32 plam. Łańcuch i przebicie mają stałe limity; wyszukiwanie celów korzysta z istniejącej siatki przestrzennej. Namierzanie Smart odświeża się co 0,08 s oraz przed strzałem. Geometria modeli i efekty wykorzystują istniejące instancjonowane partie renderowania. Nie powstają osobne obiekty sceny dla każdego płomienia ani pełne przeglądy wszystkich par jednostek.
 
-`native/manual_tests.cpp` weryfikuje rzeczywiste obrażenia, stożek, przebicie, czas lotu, pościg za ruchomym celem, bezpieczeństwo generacji, plamy, spowolnienie, pauzę i cykl lancy. `TEST_MANUALNYCH.bat` uruchamia test graficzny wyboru i ostrzału wszystkich dziewięciu modułów. Raport i zrzuty celowników oraz modeli: `artifacts/command/manual/`.
+`native/manual_tests.cpp` weryfikuje rzeczywiste obrażenia, stożek, przebicie, czas lotu, pościg za ruchomym celem, bezpieczeństwo generacji, plamy, spowolnienie, pauzę i cykl lancy. `TEST_MANUALNYCH.bat` uruchamia test graficzny wyboru i ostrzału wszystkich dziesięciu modułów. Raport i zrzuty celowników oraz modeli: `artifacts/command/manual/`.
 
-Aktualizacja: wszystkie dziewięć modułów ma już własne legendarne ulepszenie. Smart domyślnie namierza przez 0,5 s; Instant namierzanie przywraca blokadę bez oczekiwania. Szczegóły sześciu nowych legend, modeli i testów: [LEGENDY_MANUALNE.md](LEGENDY_MANUALNE.md).
+Aktualizacja: dotychczasowe dziewięć modułów ma własne legendarne ulepszenie. Smart domyślnie namierza przez 0,5 s; Instant namierzanie przywraca blokadę bez oczekiwania. Szczegóły sześciu nowych legend, modeli i testów: [LEGENDY_MANUALNE.md](LEGENDY_MANUALNE.md).

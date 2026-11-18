@@ -9,10 +9,10 @@ void require(bool ok, const char* message) {
   if (!ok)
     throw std::runtime_error(message);
 }
-double rms(const std::vector<float>& samples) {
+double rms(const std::vector<float>& samples, float ceiling = .17f) {
   double energy = 0;
   for (auto v : samples) {
-    require(std::isfinite(v) && std::abs(v) < .17f, "Unsafe or non-finite audio sample");
+    require(std::isfinite(v) && std::abs(v) < ceiling, "Unsafe or non-finite audio sample");
     energy += v * v;
   }
   return std::sqrt(energy / samples.size());
@@ -38,8 +38,8 @@ int main() {
       fx.step(.01f, gun, true, false, false, false);
       fx.shot(gun);
       fx.step(.05f, gun, true, false, false, false);
-      require(std::abs(fx.pose.roll) > 0 && std::abs(fx.pose.roll) < .014f &&
-                  length(fx.pose.offset) < .08f,
+      require(std::abs(fx.pose.roll) > 0 && std::abs(fx.pose.roll) < (gun==Gun::Shotgun?.2f:.014f) &&
+                  length(fx.pose.offset) < (gun==Gun::Shotgun?.4f:.08f),
               "Shot tilt missing or too strong");
       for (int i = 0; i < 120; ++i)
         fx.step(1.f / 60, gun, true, false, false, false);
@@ -203,7 +203,8 @@ int main() {
       synth.set(c);
       c.shots = 1;
       synth.set(c);
-      require(rms(samples(synth, 2400)) > 1e-5, "Missing manual shot mechanical layer");
+      require(rms(samples(synth, 2400), c.gun == Gun::Shotgun ? .49f : .17f) > 1e-5,
+              "Missing manual shot mechanical layer");
     }
     {
       // Reviewable mono WAV: charge -> normal beam -> uranium reserve -> release.
